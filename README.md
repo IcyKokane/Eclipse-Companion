@@ -1,8 +1,8 @@
-# Eclipse Companion · Android V0.4.0 (source development milestone)
+# Eclipse Companion · Android V0.4.0 (CI-built debug APK milestone)
 
 A **private, offline-first Android AI companion for consenting adults 18+**. This is a standalone project, not part of The Fool, Icarus, Vesper, or any other agent. The Android application includes native Kotlin UI and a local C++ llama.cpp bridge, and requests **no INTERNET permission**. The owner imports a compatible GGUF file. No accounts, analytics, or API keys.
 
-**Release status: SOURCE, NOT A TESTED APK.** There is no bundled GGUF, image-generation model, APK, vendor llama.cpp tree, or generated source installer in this release. Host Kotlin tests pass. Android/NDK compilation, installation, conversation latency and crash behavior must still be checked using the included CI workflow and a real Android arm64 device. An Android 28+ device is required.
+**Release status: FIRST CI-BUILT DEBUG APK.** GitHub Actions run [40224719071](https://github.com/IcyKokane/Eclipse-Companion/actions/runs/40224719071) passed Android compilation, JVM tests, native arm64 library and offline-permission checks. Download the `EclipseCompanion-v0.4-debug-apk` artifact from that run or install the independently extracted `Eclipse_Companion_v0.4_Debug.apk` provided with the release. **No GGUF model is bundled; Android-device chat, performance, image import and cancellation are not yet tested.** The debug build targets Android 28+ arm64.
 
 ## What's new in V0.4
 
@@ -39,7 +39,7 @@ Requirements on a development machine or in GitHub Actions: Android SDK 35, Andr
 1. Use `bash scripts/setup-llama.sh` on the build machine to download and verify the precise llama.cpp revision. This is **build-time internet use on the developer PC/CI**, not app traffic.
 2. Build with `gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug` or Android Studio after creating/importing the project.
 3. Result, if the build succeeds: `app/build/outputs/apk/debug/app-debug.apk`. Transfer and install on an Android arm64 phone. Android Studio can provision a Gradle wrapper; this source ZIP does not include one.
-4. For a private GitHub repository, `.github/workflows/android-debug.yml` sets up tools, retrieves pinned llama.cpp, performs static audits and JVM tests, builds the debug APK and uploads an artifact. **CI workflow was prepared but has not been executed for V0.4 here. This project is not yet published to an Eclipse Companion GitHub repository.**
+4. The public repository `.github/workflows/android-debug.yml` builds and uploads a debug APK on each push. **GitHub Actions run 40224719071 succeeded on October 25, 2026.** Build-time llama.cpp downloads do not grant the installed app internet access.
 5. For local host smoke testing when `kotlinc` is installed: `bash scripts/test-core.sh` and `python3 scripts/audit-source.py`.
 6. On first launch, confirm 18+, open **Privacy**, import a suitable **GGUF**, tap **Load local model**, and go to **Chat**. The model file can be obtained using a separate browser before offline use; importing a model via the Android system file picker does not require this app to have internet access.
 
@@ -63,9 +63,9 @@ For a basic low-resource test: Apache-2.0 `Qwen/Qwen2.5-1.5B-Instruct-GGUF`, Q4_
 | Reply-session commit/cancel invariants | PASS: 16 assertions using `kotlinc`/JDK |
 | Static source, privacy and build invariants | PASS: 50 assertions |
 | Shell script syntax | PASS |
-| Android Gradle/Kotlin compilation | **NOT RUN: no Android SDK/NDK in this environment** |
-| Native llama.cpp Android link | **NOT RUN: vendor/build tools not installed in this environment** |
-| Signed/installable APK | **NOT PRODUCED** |
+| Android Gradle/Kotlin compilation | **PASS (GitHub Actions run 40224719071)** |
+| Native llama.cpp Android link | **PASS: arm64 shared library present in APK** |
+| Debug APK packaging | **PASS: 4,992,051-byte APK; installation on a phone NOT TESTED** |
 | Physical Android model load / chat / portrait controls | **NOT TESTED** |
 | Generative image-to-image portraits | **NOT IMPLEMENTED** |
 | Offline voice input/output | **NOT IMPLEMENTED** |
@@ -76,8 +76,8 @@ A source-level API comparison with llama.cpp 0.6.0's published C header was perf
 ## Planned milestones
 
 - **V0.3 (previous release):** improved interrupted-response handling, import robustness, long-chat inference, pinned native API compatibility. Android compile/device work remains unverified.
-- **V0.4 (this release):** strengthen foreground lifecycle, cancellation, composer state and APK acceptance gates. CI APK compilation and on-device validation remain outstanding.
-- **Next build milestone:** run CI in a dedicated private Eclipse Companion repository, fix any Gradle/NDK errors and distribute a validated debug APK for arm64 device testing.
+- **V0.4 (this release):** foreground lifecycle, cancellation, composer state and build verification gates; Android debug APK successfully compiled, on-device validation outstanding.
+- **Next validation milestone:** install the debug APK on a real arm64 phone, import a compatible GGUF, assess inference speed, native crashes, storage and customization; then continue offline-generated portraits and voice.
 - **V0.5:** prototype true local image-to-image with an appropriate mobile model, model import and thermal/RAM safeguards. It may need more RAM and acceleration than the base chatbot.
 - **V0.6:** opt-in offline speech recognition and text-to-speech, app lock, encrypted memory review and export/import.
 
