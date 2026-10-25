@@ -1,0 +1,11 @@
+.gradle/
+build/
+app/build/
+.idea/
+*.iml
+local.properties
+app/src/main/cpp/vendor/
+app/.cxx/
+app/src/main/cpp/vendor/
+LLAMA_COMMIT.txt
+*.apk
