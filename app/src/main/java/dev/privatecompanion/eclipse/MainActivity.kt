@@ -3,6 +3,9 @@ package dev.privatecompanion.eclipse
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.Intent
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.Typeface
@@ -23,6 +26,7 @@ import android.view.WindowManager
 import android.widget.Button
 import android.widget.EditText
 import android.widget.ImageView
+import android.view.inputmethod.InputMethodManager
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.SeekBar
@@ -37,6 +41,9 @@ class MainActivity : Activity() {
     private lateinit var root: LinearLayout
     private lateinit var content: LinearLayout
     private lateinit var chatScroll: ScrollView
+    private var composerEdit: EditText? = null
+    private val navigationButtons = linkedMapOf<String, Button>()
+    private var lastAppliedPadding = EdgePadding(0, 0, 0, 0)
     private var sending = false
     private var conversationRevision = 0L
     private val replyGate = ReplySessionGate()
@@ -67,6 +74,8 @@ class MainActivity : Activity() {
                 .setCancelable(false).setPositiveButton("Close") { _, _ -> finish() }.show()
             return
         }
+        // Allow screenshots only for the current session; relaunch always starts private.
+        store.screenshotsAllowed = false
         updateCaptureSecurity()
         runCatching { ModelFiles.recover(filesDir) }.onFailure {
             status = "Previous model recovery needs attention: ${it.message}"
@@ -138,12 +147,21 @@ class MainActivity : Activity() {
         view.requestApplyInsets()
     }
 
-    /** Android 15+ places content behind status, cutout and navigation bars. */
+    /** Preserve view margins while reserving status/cutout, navigation and keyboard insets. */
     private fun applySafeInsets(view: View) {
         if (Build.VERSION.SDK_INT >= 35) {
+            val original = EdgePadding(view.paddingLeft, view.paddingTop, view.paddingRight, view.paddingBottom)
             view.setOnApplyWindowInsetsListener { target, insets ->
                 val safe = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout())
-                target.setPadding(safe.left, safe.top, safe.right, safe.bottom)
+                val keyboard = insets.getInsets(WindowInsets.Type.ime())
+                val padding = MobileWindowPadding.resolve(
+                    initial = original,
+                    safeArea = EdgePadding(safe.left, safe.top, safe.right, safe.bottom),
+                    keyboardBottom = keyboard.bottom,
+                    keyboardVisible = insets.isVisible(WindowInsets.Type.ime())
+                )
+                lastAppliedPadding = padding
+                target.setPadding(padding.left, padding.top, padding.right, padding.bottom)
                 insets
             }
             view.requestApplyInsets()
@@ -173,6 +191,23 @@ class MainActivity : Activity() {
             updateCaptureSecurity()
             toast("Could not save screenshot setting: ${e.message}")
         }
+    }
+
+    /** Diagnostic information contains layout metrics only, not chat/profile/model content. */
+    private fun copyLayoutDiagnostics() {
+        val display = resources.displayMetrics
+        val detail = """
+            Eclipse Companion UI Preview 0.4.3
+            Android SDK: ${Build.VERSION.SDK_INT}
+            Display pixels: ${display.widthPixels} x ${display.heightPixels}
+            Density: ${display.density}
+            Font scale: ${resources.configuration.fontScale}
+            Window padding px: ${lastAppliedPadding.left}, ${lastAppliedPadding.top}, ${lastAppliedPadding.right}, ${lastAppliedPadding.bottom}
+            Screen capture allowed this session: ${store.screenshotsAllowed}
+        """.trimIndent()
+        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        clipboard.setPrimaryClip(ClipData.newPlainText("Eclipse UI diagnostics", detail))
+        toast("UI diagnostics copied (no chats or private memories)")
     }
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density + 0.5f).toInt()
@@ -232,12 +267,15 @@ class MainActivity : Activity() {
         titleBar.addView(label("ECLIPSE  ·  PRIVATE COMPANION", 17f, light, true))
         titleBar.addView(label("Offline only  •  On-device conversations", 12f, muted))
         root.addView(titleBar)
+        // Recreate the navigation binding for each Activity, including after rotation.
+        navigationButtons.clear()
         // Two-column tabs remain legible on narrow screens and with larger fonts.
         val tabs = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; pad(this, 8, 2) }
         listOf(listOf("Chat", "Personality"), listOf("Appearance", "Privacy")).forEach { names ->
             val tabRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
             names.forEach { name ->
-                val tab = button(name) { pane = name; render() }
+                val tab = button(name) { navigateTo(name) }
+                navigationButtons[name] = tab
                 if (pane == name) tab.background = bg(Color.rgb(125, 86, 184), dp(12).toFloat())
                 tabRow.addView(tab, LinearLayout.LayoutParams(0, dp(52), 1f).apply {
                     setMargins(dp(3), dp(2), dp(3), dp(2))
@@ -257,15 +295,47 @@ class MainActivity : Activity() {
         render()
     }
 
+    /** Always reveal a new settings page from the top, and highlight the actual active tab. */
+    private fun navigateTo(name: String) {
+        if (name !in navigationButtons) return
+        if (name != pane) {
+            currentFocus?.let { field ->
+                (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager)
+                    .hideSoftInputFromWindow(field.windowToken, 0)
+                field.clearFocus()
+            }
+        }
+        pane = name
+        for ((tabName, button) in navigationButtons) {
+            button.background = bg(
+                if (tabName == pane) Color.rgb(125, 86, 184) else Color.rgb(100, 68, 151),
+                dp(12).toFloat()
+            )
+        }
+        render()
+        if (name != "Chat") {
+            chatScroll.post { if (pane == name) chatScroll.scrollTo(0, 0) }
+        }
+    }
+
     private fun render() {
         content.removeAllViews()
+        composerEdit = null
         when (pane) {
             "Chat" -> chatPane()
             "Personality" -> personalityPane()
             "Appearance" -> appearancePane()
             else -> privacyPane()
         }
-        if (pane == "Chat") chatScroll.post { chatScroll.fullScroll(View.FOCUS_DOWN) }
+        if (pane == "Chat") chatScroll.post {
+            if (pane == "Chat") {
+                // For long chats, reveal the composer instead of scrolling past Send to suggestions.
+                val position = if (store.messages.isNotEmpty()) {
+                    ((composerEdit?.top ?: 0) - dp(72)).coerceAtLeast(0)
+                } else 0
+                chatScroll.scrollTo(0, position)
+            }
+        }
     }
 
     private fun chatPane() {
@@ -310,6 +380,7 @@ class MainActivity : Activity() {
         }
         if (store.messages.size > 50) content.addView(label("Showing the most recent 50 messages. Older messages remain saved locally.", 12f, muted))
         val edit = input(draftText, "Type a message to ${store.profile.name}...", 3)
+        composerEdit = edit
         edit.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
@@ -319,28 +390,6 @@ class MainActivity : Activity() {
         })
         content.addView(edit, LinearLayout.LayoutParams(-1, -2))
         space(8)
-        content.addView(label("Conversation ideas · prepared on device (tap to edit)", 12f, muted))
-        val dateIndex = System.currentTimeMillis() / 86_400_000L
-        CompanionLogic.dailyStarters(store.profile, dateIndex).forEach { idea ->
-            content.addView(button(idea.title) {
-                edit.setText(idea.message)
-                edit.setSelection(edit.text.length)
-                edit.requestFocus()
-            }, LinearLayout.LayoutParams(-1, dp(50)).apply { bottomMargin = dp(5) })
-        }
-        space(8)
-        if (!sending && store.messages.lastOrNull()?.role == "user") {
-            content.addView(button("Generate/retry reply to last message") { startReply() },
-                LinearLayout.LayoutParams(-1, dp(52)).apply { bottomMargin = dp(7) })
-        }
-        if (sending) {
-            content.addView(button("Stop current response") {
-                replyGate.cancel()
-                LocalModel.cancel()
-                status = "Stopping local generation..."
-                if (pane == "Chat") render()
-            }, LinearLayout.LayoutParams(-1, dp(52)).apply { bottomMargin = dp(7) })
-        }
         val send = button(if (sending) "Thinking on device..." else "Send message") {
             if (sending || modelBusy) return@button
             if (!LocalModel.ready()) { toast("Load a GGUF model in Privacy first."); return@button }
@@ -358,6 +407,30 @@ class MainActivity : Activity() {
         }
         send.isEnabled = !sending && !modelBusy
         content.addView(send, LinearLayout.LayoutParams(-1, dp(52)))
+        space(8)
+        if (!sending && store.messages.lastOrNull()?.role == "user") {
+            content.addView(button("Generate/retry reply to last message") { startReply() },
+                LinearLayout.LayoutParams(-1, dp(52)).apply { bottomMargin = dp(7) })
+        }
+        if (sending) {
+            content.addView(button("Stop current response") {
+                replyGate.cancel()
+                LocalModel.cancel()
+                status = "Stopping local generation..."
+                if (pane == "Chat") render()
+            }, LinearLayout.LayoutParams(-1, dp(52)).apply { bottomMargin = dp(7) })
+        }
+        space(8)
+        content.addView(label("Conversation ideas · prepared on device (tap to edit)", 12f, muted))
+        val dateIndex = System.currentTimeMillis() / 86_400_000L
+        CompanionLogic.dailyStarters(store.profile, dateIndex).forEach { idea ->
+            content.addView(button(idea.title) {
+                edit.setText(idea.message)
+                edit.setSelection(edit.text.length)
+                edit.requestFocus()
+            }, LinearLayout.LayoutParams(-1, dp(50)).apply { bottomMargin = dp(5) })
+        }
+        space(8)
     }
 
     private fun startReply() {
@@ -571,6 +644,12 @@ class MainActivity : Activity() {
                     .show()
             }
         })
+        space(8)
+        content.addView(button("Copy UI layout diagnostics") { copyLayoutDiagnostics() })
+        content.addView(label(
+            "Copies only Android screen dimensions, font scale and safe-area padding; no conversations or companion memories.",
+            12f, muted
+        ))
         space(18)
         section("Local model & privacy")
         content.addView(label("The app has no INTERNET permission. No account or API key is used. Load a compatible local GGUF instruct/chat model for responses.", 14f, muted))
@@ -665,7 +744,7 @@ class MainActivity : Activity() {
             requestImage -> try {
                 AvatarStudio.fromReference(this, uri)
                 AvatarStudio.create(this, store.profile.appearance).recycle()
-                pane = "Appearance"; render()
+                navigateTo("Appearance")
                 toast("Reference transformed and stored privately")
             } catch (e: Exception) { toast("Image import failed: ${e.message}") }
             requestModel -> importModel(uri)
@@ -676,7 +755,7 @@ class MainActivity : Activity() {
         if (sending || modelBusy) { toast("Finish the current model operation or reply first"); return }
         modelBusy = true
         status = "Importing GGUF file into private local storage..."
-        pane = "Privacy"; render()
+        navigateTo("Privacy")
         worker.execute {
             try {
                 val size = contentResolver.openAssetFileDescriptor(uri, "r")?.use { it.length } ?: -1L
@@ -739,6 +818,11 @@ class MainActivity : Activity() {
             replyGate.cancel()
             LocalModel.cancel()
             status = "Generation stopped when Eclipse left the foreground. Retry when ready."
+        }
+        // Avoid capturing sensitive content in the recent-apps view once Eclipse is backgrounded.
+        if (store.screenshotsAllowed) {
+            store.screenshotsAllowed = false
+            updateCaptureSecurity()
         }
         super.onStop()
     }
