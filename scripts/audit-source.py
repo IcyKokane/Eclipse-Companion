@@ -62,4 +62,7 @@ assert 'openUiSafely()' in activity and 'showStartupFailure(' in activity
 assert 'Retry startup' in activity
 assert 'ageConfirmed = false' in secure
 assert 'Portrait unavailable; using fallback icon' in activity
-print('PASS: 54 static source/privacy/build checks (NOT runtime security validation)')
+assert 'cipher.init(Cipher.ENCRYPT_MODE, key())' in secure
+assert 'val nonce = cipher.iv' in secure
+assert 'Cipher.ENCRYPT_MODE, key(), GCMParameterSpec' not in secure
+print('PASS: 57 static source/privacy/build checks (NOT runtime security validation)')
