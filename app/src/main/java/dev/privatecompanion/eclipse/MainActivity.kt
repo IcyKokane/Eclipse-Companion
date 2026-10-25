@@ -378,7 +378,11 @@ class MainActivity : Activity() {
             space(4)
         }
         if (store.messages.isEmpty()) {
-            content.addView(label("Your conversation begins here. Import and load an on-device model, then say hello.", 15f, muted))
+            content.addView(label(
+                "Your conversation starts here. Import and load a local GGUF model in Privacy, " +
+                    "then use the Ideas button beside Send to pick a first message.",
+                15f, muted
+            ))
         }
         for (m in store.messages.takeLast(50)) {
             val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; pad(this, 13, 10) }
@@ -388,7 +392,7 @@ class MainActivity : Activity() {
             content.addView(box, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 9 })
         }
         if (store.messages.size > 50) content.addView(label("Showing the most recent 50 messages. Older messages remain saved locally.", 12f, muted))
-        content.addView(label("Conversation ideas are available from the Ideas button beside Send.", 12f, muted))
+
     }
 
     /** Fixed chat input, not inside the message ScrollView. Remains reachable with the keyboard. */
@@ -407,6 +411,7 @@ class MainActivity : Activity() {
         })
         composerDock.addView(edit, LinearLayout.LayoutParams(-1, -2))
         val actions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        val actionState = ComposerPolicy.evaluate(sending, modelBusy, store.messages.lastOrNull()?.role)
         val send = button(if (sending) "Thinking..." else "Send message") {
             if (sending || modelBusy) return@button
             if (!LocalModel.ready()) { toast("Load a GGUF model in Privacy first."); return@button }
@@ -422,18 +427,18 @@ class MainActivity : Activity() {
             conversationRevision++
             startReply()
         }
-        send.isEnabled = !sending && !modelBusy
+        send.isEnabled = actionState.sendEnabled
         actions.addView(send, LinearLayout.LayoutParams(0, dp(52), 2f).apply {
             rightMargin = dp(6)
         })
         actions.addView(button("Ideas") { showStarterDialog() },
             LinearLayout.LayoutParams(0, dp(52), 1f))
         composerDock.addView(actions)
-        if (!sending && store.messages.lastOrNull()?.role == "user") {
+        if (actionState.showRetry) {
             composerDock.addView(button("Generate/retry reply to last message") { startReply() },
                 LinearLayout.LayoutParams(-1, dp(48)))
         }
-        if (sending) {
+        if (actionState.showStop) {
             composerDock.addView(button("Stop current response") {
                 replyGate.cancel()
                 LocalModel.cancel()
