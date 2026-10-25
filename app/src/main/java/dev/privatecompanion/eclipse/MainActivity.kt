@@ -50,6 +50,7 @@ class MainActivity : Activity() {
     private val replyGate = ReplySessionGate()
     private var draftText = ""
     private val captureSession = CaptureSession()
+    private var refreshPrivacyOnResume = false
     private var modelBusy = false
     private var pane = "Chat"
     private var status = "Import a GGUF model to begin private AI conversations."
@@ -839,6 +840,15 @@ class MainActivity : Activity() {
         super.onSaveInstanceState(outState)
     }
 
+    override fun onResume() {
+        super.onResume()
+        // Revocation also updates the button label after returning from another app.
+        if (refreshPrivacyOnResume && ::composerDock.isInitialized && pane == "Privacy") {
+            refreshPrivacyOnResume = false
+            render()
+        }
+    }
+
     override fun onStop() {
         // The AI should not complete and save a reply when the app leaves the foreground.
         if (sending) {
@@ -850,6 +860,7 @@ class MainActivity : Activity() {
         if (captureSession.isAllowed) {
             captureSession.background()
             updateCaptureSecurity()
+            refreshPrivacyOnResume = true
         }
         super.onStop()
     }
