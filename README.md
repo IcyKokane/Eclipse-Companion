@@ -1,4 +1,29 @@
-# Eclipse Companion · Android V0.4.3 Mobile Layout Test
+# Eclipse Companion · Android V0.4.4 Fixed Composer Test
+
+**V0.4.4 remains an Android preview milestone, not a production release.** The APK compiles the same offline llama.cpp engine; no internet permission and no GGUF model bundled.
+
+## What changed
+
+- Chat history scrolls independently while a compact message composer stays docked above the Android keyboard. **Send message** and **Ideas** are always near the text field instead of being buried below conversation suggestions.
+- A short Ideas chooser inserts an editable conversation starter into the composer without sending it automatically.
+- Reply Stop or Retry is displayed in the fixed composer when appropriate; the JVM-tested `ComposerPolicy` ensures conflicting actions are not enabled during generation or model operations.
+- The unsent draft is retained across UI refreshes and Activity recreation (as in earlier versions). Chat messages remain in encrypted local storage; the preview does not transfer private data from other installs.
+- Existing Android 15/16 safe insets, debug diagnostics and temporary screenshot permission continue from V0.4.3. Screen capture is blocked at startup and after the app backgrounds.
+
+**Safe parallel test:** the debug APK is named **Eclipse UI Test 0.4.4** with distinct Android package ID `dev.privatecompanion.eclipse.preview44`. It can be installed without removing Eclipse Companion or earlier UI previews. Its private storage is independent, and important messages/models should remain in the previously installed app until export and stable signing are available.
+
+### Device verification
+
+1. Launch Eclipse UI Test 0.4.4. Check Chat, Personality, Appearance and Privacy.
+2. Open the keyboard in Chat. Send and Ideas should stay visible immediately above it while messages can still scroll.
+3. Tap Ideas, select a prompt, and verify the text is **not** sent automatically.
+4. Switch tabs and return; verify unsent draft is still present.
+5. Use the Privacy screen's copyable UI diagnostics or temporarily enable screenshot capture if controls remain obscured.
+6. Model import and on-device inference performance are not verified by the CI build; real hardware testing is still required.
+
+---
+
+## V0.4.3 Mobile Layout Test (previous milestone)
 
 **V0.4.3 is an Android debug preview for testing, not a verified stable Android release.**
 
