@@ -1,4 +1,30 @@
-# Eclipse Companion · Android V0.4.1 (startup recovery candidate)
+# Eclipse Companion · Android V0.4.2 UI preview
+
+**Android 16 interface correction and private screenshot troubleshooting** (test build; requires device verification).
+
+A private, offline-first Android AI companion for consenting adults 18+. No INTERNET permission, cloud service, accounts or bundled GGUF model.
+
+## V0.4.2 Android layout changes
+
+- Respects Android 15/16 mandatory edge-to-edge status-bar, display-cutout and bottom-navigation insets using Android framework WindowInsets.
+- Replaces four narrow top tabs with legible two-column navigation; scales view dimensions with screen density, increases button text and prevents OEM button background tint.
+- Replaces potentially unreadable native spinners with dark buttons opening simple choice dialogs; keeps Appearance, Personality, Chat and Privacy accessible.
+- Adds Privacy → Screen capture → **Allow** as an explicit, reversible choice. Defaults to blocking screenshots and screen recordings using FLAG_SECURE. Screenshot permission is encrypted with user settings. After recording a UI issue, turn protection back on.
+- Includes previous 0.4.1 Android Keystore initialization fix. CI compilation is not the same as a phone validation.
+
+**Important installation safety:** This v0.4.2 *debug preview* uses a different Android package ID `dev.privatecompanion.eclipse.preview` and launcher name **Eclipse Companion Preview**, so it can install beside the existing v0.4.1 **Eclipse Companion** without uninstalling or losing its private data. Their conversations, imported GGUF models and character settings are separate. There is no automatic migration and **do not uninstall the old installation** if it holds any important content. Future debug builds may have different signing keys; this preview should not be used as an archival store for important chats.
+
+### Manual phone verification
+
+1. Install the v0.4.2 UI-preview debug artifact from its successful GitHub Actions run. Open **Eclipse Companion Preview** (not the older icon).
+2. Check that the first header is beneath the phone's status bar; ensure the lower controls stay above the navigation bar, with or without the keyboard.
+3. Switch between Chat, Personality, Appearance and Privacy. Check readable button labels, choice dialogs and ability to scroll.
+4. In Privacy → Screen capture, choose **Allow** and take a screenshot of a non-sensitive screen. Turn screen capture back to **Blocked** when finished.
+5. Do not import models or copy private conversations until the user has verified the interface.
+
+---
+
+## V0.4.1 startup recovery (previous milestone)
 
 A **private, offline-first Android AI companion for consenting adults 18+**. This is a standalone project, not part of The Fool, Icarus, Vesper, or any other agent. The Android application includes native Kotlin UI and a local C++ llama.cpp bridge, and requests **no INTERNET permission**. The owner imports a compatible GGUF file. No accounts, analytics, or API keys.
 

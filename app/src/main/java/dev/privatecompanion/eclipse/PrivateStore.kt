@@ -20,6 +20,8 @@ class PrivateStore(private val context: Context) {
     val messages = mutableListOf<ChatEntry>()
     var ageConfirmed = false
         private set
+    // Default to secure display; only the owner may enable screen capture.
+    var screenshotsAllowed = false
 
     private fun key(): SecretKey {
         val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
@@ -56,6 +58,7 @@ class PrivateStore(private val context: Context) {
         cipher.init(Cipher.DECRYPT_MODE, key(), GCMParameterSpec(128, ciphertext.copyOfRange(1, 13)))
         val decoded = JSONObject(String(cipher.doFinal(ciphertext, 13, ciphertext.size - 13), Charsets.UTF_8))
         ageConfirmed = decoded.optBoolean("ageConfirmed", false)
+        screenshotsAllowed = decoded.optBoolean("screenshotsAllowed", false)
         val person = decoded.optJSONObject("profile") ?: JSONObject()
         val trait = person.optJSONObject("traits") ?: JSONObject()
         val appearance = person.optJSONObject("appearance") ?: JSONObject()
@@ -115,6 +118,7 @@ class PrivateStore(private val context: Context) {
         val root = JSONObject().apply {
             put("schema", 2)
             put("ageConfirmed", ageConfirmed)
+            put("screenshotsAllowed", screenshotsAllowed)
             put("profile", person)
             put("messages", JSONArray().apply {
                 messages.takeLast(1000).filter { CompanionLogic.requireValidRole(it.role) }.forEach { m ->
@@ -141,6 +145,7 @@ class PrivateStore(private val context: Context) {
         messages.clear()
         profile = CompanionProfile()
         ageConfirmed = false
+        screenshotsAllowed = false
         file.delete()
         File(context.filesDir, "portrait.png").delete()
         File(context.filesDir, "reference.png").delete()

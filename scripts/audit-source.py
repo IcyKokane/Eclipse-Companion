@@ -29,7 +29,7 @@ assert 'Graphic Novel' in activity and 'Monochrome' in activity
 assert 'ECLIPSE_ERROR:' in model
 assert '}.onFailure { error ->' in activity
 assert 'd81235049384534c167caea52b85a694f6103d14' in read('scripts/setup-llama.sh')
-assert 'versionName = "0.4.1"' in read('app/build.gradle.kts')
+assert 'versionName = "0.4.2"' in read('app/build.gradle.kts')
 assert 'android.permission.ACCESS_NETWORK_STATE' not in manifest
 assert 'messages.takeLast(1000)' in secure
 assert 'nativeCancel' in model and 'nativeResetCancel' in model
@@ -43,8 +43,8 @@ assert 'stop_requested.store(true' in read('app/src/main/cpp/bridge.cpp')
 assert 'roles.erase(roles.begin() + 1, roles.begin() + 1 + discard)' in read('app/src/main/cpp/bridge.cpp')
 assert 'llama_sampler_accept' in read('app/src/main/cpp/bridge.cpp')
 assert 'model_previous.bak' in secure
-assert 'versionCode = 5' in read('app/build.gradle.kts')
-assert 'EclipseCompanion-v0.4.1-debug-apk' in read('.github/workflows/android-debug.yml')
+assert 'versionCode = 6' in read('app/build.gradle.kts')
+assert 'EclipseCompanion-v0.4.2-ui-preview-apk' in read('.github/workflows/android-debug.yml')
 assert 'replyGate.mayCommit(ticket)' in activity
 assert 'replyGate.cancel()' in activity
 assert 'override fun onStop()' in activity
@@ -65,4 +65,16 @@ assert 'Portrait unavailable; using fallback icon' in activity
 assert 'cipher.init(Cipher.ENCRYPT_MODE, key())' in secure
 assert 'val nonce = cipher.iv' in secure
 assert 'Cipher.ENCRYPT_MODE, key(), GCMParameterSpec' not in secure
-print('PASS: 57 static source/privacy/build checks (NOT runtime security validation)')
+assert 'WindowInsets.Type.systemBars()' in activity
+assert 'WindowInsets.Type.displayCutout()' in activity
+assert 'root.requestApplyInsets()' in activity
+assert 'listOf(listOf("Chat", "Personality")' in activity
+assert 'backgroundTintList = null' in activity
+assert 'setSingleChoiceItems(' in activity
+assert 'Screen capture: ALLOWED' in activity and 'Screen capture: BLOCKED' in activity
+assert 'screenshotsAllowed = decoded.optBoolean("screenshotsAllowed", false)' in secure
+assert 'put("screenshotsAllowed", screenshotsAllowed)' in secure
+assert 'android:name="dev.privatecompanion.eclipse.MainActivity"' in manifest
+assert 'applicationIdSuffix = ".preview"' in read('app/build.gradle.kts')
+assert 'Eclipse Companion Preview' in read('app/build.gradle.kts')
+print('PASS: 69 static source/privacy/build checks (NOT runtime security validation)')
