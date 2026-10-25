@@ -26,8 +26,6 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.SeekBar
-import android.widget.Spinner
-import android.widget.ArrayAdapter
 import android.widget.TextView
 import android.widget.Toast
 import java.io.File
@@ -137,6 +135,7 @@ class MainActivity : Activity() {
         })
         applySafeInsets(view)
         setContentView(view)
+        view.requestApplyInsets()
     }
 
     /** Android 15+ places content behind status, cutout and navigation bars. */
@@ -228,6 +227,7 @@ class MainActivity : Activity() {
         root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(dark) }
         applySafeInsets(root)
         setContentView(root)
+        root.requestApplyInsets()
         val titleBar = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; pad(this, 16, 6) }
         titleBar.addView(label("ECLIPSE  ·  PRIVATE COMPANION", 17f, light, true))
         titleBar.addView(label("Offline only  •  On-device conversations", 12f, muted))
