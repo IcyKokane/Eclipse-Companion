@@ -1,4 +1,31 @@
-# Eclipse Companion · Android V0.4.3 Mobile Layout Test
+# Eclipse Companion · Android V0.4.4 Sticky Chat Preview
+
+**V0.4.4 is a development preview, not a production-ready Android release.** Physical device visual tests and GGUF inference tests remain outstanding.
+
+## Main changes
+
+- **Always-reachable Chat composer:** the text field, Send, Ideas, Stop and Retry controls now live in a fixed bottom panel outside the scrollable message history. They stay in reach above the on-screen keyboard (using the V0.4.3 safe-area/IME insets).
+- **Compact Ideas selector:** choose on-device conversation starter prompts from an accessible dialog instead of scrolling past a column of buttons. Ideas fill the draft but are not sent automatically.
+- **First-run guidance:** while a model is not loaded, Chat links directly to Privacy, where the owner can import and load a GGUF model.
+- **Session-only screenshot consent:** Privacy can temporarily allow screenshots for diagnostics, but the permission is no longer written to the encrypted companion file. Screen capture is blocked on new launches and revoked when the app leaves the foreground. Earlier persisted `screenshotsAllowed` fields are safely ignored.
+- **Added privacy regression tests:** `CaptureSessionTest` exercises blocked-by-default, enable, disable, background revocation, and fresh-session reset. Existing `MobileWindowPaddingTest` runs unchanged.
+
+## Installation and verification
+
+This debug preview is a **separate app**, Android package `dev.privatecompanion.eclipse.preview44`, label **Eclipse Chat Test 0.4.4**. It can be installed beside V0.4.1 / V0.4.2 / V0.4.3 and **does not migrate or modify** their conversations, portraits or imported model files. Avoid uninstalling existing installations with important local data.
+
+1. Install the V0.4.4 Android test APK from a successful GitHub Actions build.
+2. Verify status and navigation bars do not hide the header or composer.
+3. Type in Chat and open the keyboard: Send and Ideas should remain accessible.
+4. Select Ideas, confirm it only fills the draft, then tap Send (which requires an imported and loaded GGUF model).
+5. Switch to Personality, Appearance, and Privacy, check scrolling, and check that screenshot opt-in works only until the app is backgrounded.
+6. Use **Copy UI layout diagnostics** in Privacy to share screen metrics without disclosing any conversations if clipping or white rectangles persist.
+
+The APK contains no GGUF model and requests no INTERNET permission. Release signing, model performance and full device validation still need to be addressed before an everyday-use installation.
+
+---
+
+## V0.4.3 Mobile Layout Test (previous milestone)
 
 **V0.4.3 is an Android debug preview for testing, not a verified stable Android release.**
 
