@@ -265,12 +265,15 @@ class MainActivity : Activity() {
         titleBar.addView(label("ECLIPSE  ·  PRIVATE COMPANION", 17f, light, true))
         titleBar.addView(label("Offline only  •  On-device conversations", 12f, muted))
         root.addView(titleBar)
+        // Recreate the navigation binding for each Activity, including after rotation.
+        navigationButtons.clear()
         // Two-column tabs remain legible on narrow screens and with larger fonts.
         val tabs = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; pad(this, 8, 2) }
         listOf(listOf("Chat", "Personality"), listOf("Appearance", "Privacy")).forEach { names ->
             val tabRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
             names.forEach { name ->
-                val tab = button(name) { pane = name; render() }
+                val tab = button(name) { navigateTo(name) }
+                navigationButtons[name] = tab
                 if (pane == name) tab.background = bg(Color.rgb(125, 86, 184), dp(12).toFloat())
                 tabRow.addView(tab, LinearLayout.LayoutParams(0, dp(52), 1f).apply {
                     setMargins(dp(3), dp(2), dp(3), dp(2))
@@ -290,6 +293,22 @@ class MainActivity : Activity() {
         render()
     }
 
+    /** Always reveal a new settings page from the top, and highlight the actual active tab. */
+    private fun navigateTo(name: String) {
+        if (name !in navigationButtons) return
+        pane = name
+        for ((tabName, button) in navigationButtons) {
+            button.background = bg(
+                if (tabName == pane) Color.rgb(125, 86, 184) else Color.rgb(100, 68, 151),
+                dp(12).toFloat()
+            )
+        }
+        render()
+        if (name != "Chat") {
+            chatScroll.post { if (pane == name) chatScroll.scrollTo(0, 0) }
+        }
+    }
+
     private fun render() {
         content.removeAllViews()
         when (pane) {
@@ -298,7 +317,7 @@ class MainActivity : Activity() {
             "Appearance" -> appearancePane()
             else -> privacyPane()
         }
-        if (pane == "Chat") chatScroll.post { chatScroll.fullScroll(View.FOCUS_DOWN) }
+        if (pane == "Chat") chatScroll.post { if (pane == "Chat") chatScroll.fullScroll(View.FOCUS_DOWN) }
     }
 
     private fun chatPane() {
@@ -604,6 +623,12 @@ class MainActivity : Activity() {
                     .show()
             }
         })
+        space(8)
+        content.addView(button("Copy UI layout diagnostics") { copyLayoutDiagnostics() })
+        content.addView(label(
+            "Copies only Android screen dimensions, font scale and safe-area padding; no conversations or companion memories.",
+            12f, muted
+        ))
         space(18)
         section("Local model & privacy")
         content.addView(label("The app has no INTERNET permission. No account or API key is used. Load a compatible local GGUF instruct/chat model for responses.", 14f, muted))
@@ -698,7 +723,7 @@ class MainActivity : Activity() {
             requestImage -> try {
                 AvatarStudio.fromReference(this, uri)
                 AvatarStudio.create(this, store.profile.appearance).recycle()
-                pane = "Appearance"; render()
+                navigateTo("Appearance")
                 toast("Reference transformed and stored privately")
             } catch (e: Exception) { toast("Image import failed: ${e.message}") }
             requestModel -> importModel(uri)
@@ -709,7 +734,7 @@ class MainActivity : Activity() {
         if (sending || modelBusy) { toast("Finish the current model operation or reply first"); return }
         modelBusy = true
         status = "Importing GGUF file into private local storage..."
-        pane = "Privacy"; render()
+        navigateTo("Privacy")
         worker.execute {
             try {
                 val size = contentResolver.openAssetFileDescriptor(uri, "r")?.use { it.length } ?: -1L
