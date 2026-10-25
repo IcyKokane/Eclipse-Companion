@@ -29,7 +29,7 @@ assert 'Graphic Novel' in activity and 'Monochrome' in activity
 assert 'ECLIPSE_ERROR:' in model
 assert '}.onFailure { error ->' in activity
 assert 'd81235049384534c167caea52b85a694f6103d14' in read('scripts/setup-llama.sh')
-assert 'versionName = "0.4.4"' in read('app/build.gradle.kts')
+assert 'versionName = "0.4.5"' in read('app/build.gradle.kts')
 assert 'android.permission.ACCESS_NETWORK_STATE' not in manifest
 assert 'messages.takeLast(1000)' in secure
 assert 'nativeCancel' in model and 'nativeResetCancel' in model
@@ -43,8 +43,8 @@ assert 'stop_requested.store(true' in read('app/src/main/cpp/bridge.cpp')
 assert 'roles.erase(roles.begin() + 1, roles.begin() + 1 + discard)' in read('app/src/main/cpp/bridge.cpp')
 assert 'llama_sampler_accept' in read('app/src/main/cpp/bridge.cpp')
 assert 'model_previous.bak' in secure
-assert 'versionCode = 8' in read('app/build.gradle.kts')
-assert 'EclipseCompanion-v0.4.4-chat-dock-test-apk' in read('.github/workflows/android-debug.yml')
+assert 'versionCode = 9' in read('app/build.gradle.kts')
+assert 'EclipseCompanion-v0.4.5-privacy-model-test-apk' in read('.github/workflows/android-debug.yml')
 assert 'replyGate.mayCommit(ticket)' in activity
 assert 'replyGate.cancel()' in activity
 assert 'override fun onStop()' in activity
@@ -72,18 +72,22 @@ assert 'listOf(listOf("Chat", "Personality")' in activity
 assert 'backgroundTintList = null' in activity
 assert 'setSingleChoiceItems(' in activity
 assert 'Screen capture: ALLOWED' in activity and 'Screen capture: BLOCKED' in activity
-assert 'screenshotsAllowed = decoded.optBoolean("screenshotsAllowed", false)' in secure
-assert 'put("screenshotsAllowed", screenshotsAllowed)' in secure
+assert '"screenshotsAllowed"' not in secure, 'Screenshot permission must never persist'
 assert 'android:name="dev.privatecompanion.eclipse.MainActivity"' in manifest
-assert 'applicationIdSuffix = ".preview44"' in read('app/build.gradle.kts')
-assert 'Eclipse UI Test 0.4.4' in read('app/build.gradle.kts')
+assert 'applicationIdSuffix = ".preview45"' in read('app/build.gradle.kts')
+assert 'Eclipse Privacy Test 0.4.5' in read('app/build.gradle.kts')
 assert 'WindowInsets.Type.ime()' in activity
 assert 'MobileWindowPadding.resolve(' in activity
 assert 'MobileWindowPaddingTest.kt' in '\n'.join(p.name for p in (root / 'app/src/test/java/dev/privatecompanion/eclipse').glob('*'))
 assert 'private fun navigateTo(name: String)' in activity
 assert 'chatScroll.scrollTo(0, 0)' in activity
 assert 'copyLayoutDiagnostics()' in activity
-assert 'store.screenshotsAllowed = false' in activity
+assert 'captureSession.background()' in activity
+assert 'captureSession.choose(allow)' in activity
+assert 'store.screenshotsAllowed' not in activity
+assert 'class CaptureSession' in read('app/src/main/java/dev/privatecompanion/eclipse/CaptureSession.kt')
+assert 'CaptureSessionTest.kt' in '\n'.join(p.name for p in (root / 'app/src/test/java/dev/privatecompanion/eclipse').glob('*'))
+assert 'Set up local GGUF model' in activity
 assert 'updateCaptureSecurity()' in activity
 assert "private fun composerPane()" in activity
 assert "private fun showStarterDialog()" in activity
@@ -94,4 +98,4 @@ assert 'ComposerPolicy.evaluate(' in activity
 assert 'actionState.showRetry' in activity and 'actionState.showStop' in activity
 assert 'composerDock.addView(actions)' in activity
 assert 'ComposerPolicyTest.kt' in '\n'.join(p.name for p in (root / 'app/src/test/java/dev/privatecompanion/eclipse').glob('*'))
-print('PASS: 86 static source/privacy/build checks (NOT runtime security validation)')
+print('PASS: 92 static source/privacy/build checks (NOT runtime security validation)')

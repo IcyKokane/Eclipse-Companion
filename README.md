@@ -1,4 +1,31 @@
-# Eclipse Companion · Android V0.4.4 Fixed Composer Test
+# Eclipse Companion · V0.4.5 Android Privacy & Onboarding Preview
+
+**Development preview. Not an on-device-verified stable release.**
+
+V0.4.5 builds on the **already merged V0.4.4 fixed chat composer**: chat history scrolls separately, while Send, Ideas, Stop, and Retry stay in a bottom dock above the keyboard. This update retains the V0.4.4 tested `ComposerPolicy` behavior instead of replacing it with a conflicting implementation.
+
+## Changes
+
+- **Screen capture permission is truly session-only.** The private encrypted store no longer loads or saves `screenshotsAllowed`. Legacy saved copies of that field are ignored. `FLAG_SECURE` remains on by default, and any temporary screenshot permission is revoked as soon as the app backgrounds or is recreated. The Privacy control refreshes when returning.
+- **Simple on-device GGUF onboarding.** Chat clearly explains why messages cannot be generated without a loaded compatible GGUF model, and provides a button to open Privacy for import and loading. It does not pretend the model is bundled or loaded automatically.
+- **Privacy tests:** the pure `CaptureSessionTest` checks default blocking, temporary enabling, turning it off, background revocation, and fresh-session isolation.
+- **No new network capability:** Android manifest still has no INTERNET permission; on-device user data stays in app-private storage.
+
+## Install and device validation
+
+The debug APK has a distinct launcher **Eclipse Privacy Test 0.4.5** and Android package `dev.privatecompanion.eclipse.preview45`. It installs beside prior test builds and the original app without overwriting their local chats, imported GGUF files or settings. It has its own empty encrypted storage, so age confirmation and model import must be performed independently if you choose to test those features.
+
+1. Open the new app and inspect the top header, chat dock, tabs and buttons on Android.
+2. Confirm Chat shows **Set up local GGUF model** when no model is loaded; this should open Privacy.
+3. In Privacy, allow a screenshot only while you want to document the screen. Background the app and return. The control should read **BLOCKED**.
+4. Test large font size, the Android keyboard, and scrolling on all tabs.
+5. Use **Copy UI layout diagnostics** on Privacy to share screen dimensions and safe-area padding. The copied text contains no conversation content or model data.
+
+CI compilation and unit tests do **not** replace actual phone verification. Debug APKs use temporary signing keys; production signing and encrypted export/import remain future work. Avoid uninstalling any previous installation holding important data.
+
+---
+
+## V0.4.4 Fixed Composer Test (previous milestone)
 
 **V0.4.4 remains an Android preview milestone, not a production release.** The APK compiles the same offline llama.cpp engine; no internet permission and no GGUF model bundled.
 

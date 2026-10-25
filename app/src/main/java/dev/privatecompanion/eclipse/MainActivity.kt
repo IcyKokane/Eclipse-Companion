@@ -49,6 +49,8 @@ class MainActivity : Activity() {
     private var conversationRevision = 0L
     private val replyGate = ReplySessionGate()
     private var draftText = ""
+    private val captureSession = CaptureSession()
+    private var refreshPrivacyOnResume = false
     private var modelBusy = false
     private var pane = "Chat"
     private var status = "Import a GGUF model to begin private AI conversations."
@@ -76,7 +78,7 @@ class MainActivity : Activity() {
             return
         }
         // Allow screenshots only for the current session; relaunch always starts private.
-        store.screenshotsAllowed = false
+        captureSession.background()
         updateCaptureSecurity()
         runCatching { ModelFiles.recover(filesDir) }.onFailure {
             status = "Previous model recovery needs attention: ${it.message}"
@@ -175,36 +177,27 @@ class MainActivity : Activity() {
     }
 
     private fun updateCaptureSecurity() {
-        if (store.screenshotsAllowed) window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        if (captureSession.isAllowed) window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
         else window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
     }
 
     private fun setScreenshotsAllowed(allow: Boolean) {
-        val before = store.screenshotsAllowed
-        if (!allow) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
-        store.screenshotsAllowed = allow
-        try {
-            store.save()
-            updateCaptureSecurity()
-            render()
-        } catch (e: Exception) {
-            store.screenshotsAllowed = before
-            updateCaptureSecurity()
-            toast("Could not save screenshot setting: ${e.message}")
-        }
+        captureSession.choose(allow)
+        updateCaptureSecurity()
+        render()
     }
 
     /** Diagnostic information contains layout metrics only, not chat/profile/model content. */
     private fun copyLayoutDiagnostics() {
         val display = resources.displayMetrics
         val detail = """
-            Eclipse Companion UI Preview 0.4.3
+            Eclipse Companion UI Preview 0.4.5
             Android SDK: ${Build.VERSION.SDK_INT}
             Display pixels: ${display.widthPixels} x ${display.heightPixels}
             Density: ${display.density}
             Font scale: ${resources.configuration.fontScale}
             Window padding px: ${lastAppliedPadding.left}, ${lastAppliedPadding.top}, ${lastAppliedPadding.right}, ${lastAppliedPadding.bottom}
-            Screen capture allowed this session: ${store.screenshotsAllowed}
+            Screen capture allowed this session: ${captureSession.isAllowed}
         """.trimIndent()
         val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         clipboard.setPrimaryClip(ClipData.newPlainText("Eclipse UI diagnostics", detail))
@@ -377,10 +370,17 @@ class MainActivity : Activity() {
             content.addView(label(status, 13f, muted))
             space(4)
         }
-        if (store.messages.isEmpty()) {
+        if (!LocalModel.ready()) {
             content.addView(label(
-                "Your conversation starts here. Import and load a local GGUF model in Privacy, " +
-                    "then use the Ideas button beside Send to pick a first message.",
+                "A compatible local GGUF model must be imported and loaded before chat replies work. " +
+                    "Companion settings and appearance can be edited without a model.",
+                15f, muted
+            ))
+            content.addView(button("Set up local GGUF model") { navigateTo("Privacy") })
+            space(8)
+        } else if (store.messages.isEmpty()) {
+            content.addView(label(
+                "Your conversation starts here. Use Ideas beside Send for an editable first message.",
                 15f, muted
             ))
         }
@@ -658,10 +658,10 @@ class MainActivity : Activity() {
             13f, muted
         ))
         content.addView(button(
-            if (store.screenshotsAllowed) "Screen capture: ALLOWED  •  Tap to block"
+            if (captureSession.isAllowed) "Screen capture: ALLOWED  •  Tap to block"
             else "Screen capture: BLOCKED  •  Tap to allow"
         ) {
-            if (store.screenshotsAllowed) {
+            if (captureSession.isAllowed) {
                 setScreenshotsAllowed(false)
             } else {
                 AlertDialog.Builder(this)
@@ -840,6 +840,15 @@ class MainActivity : Activity() {
         super.onSaveInstanceState(outState)
     }
 
+    override fun onResume() {
+        super.onResume()
+        // Revocation also updates the button label after returning from another app.
+        if (refreshPrivacyOnResume && ::composerDock.isInitialized && pane == "Privacy") {
+            refreshPrivacyOnResume = false
+            render()
+        }
+    }
+
     override fun onStop() {
         // The AI should not complete and save a reply when the app leaves the foreground.
         if (sending) {
@@ -848,9 +857,10 @@ class MainActivity : Activity() {
             status = "Generation stopped when Eclipse left the foreground. Retry when ready."
         }
         // Avoid capturing sensitive content in the recent-apps view once Eclipse is backgrounded.
-        if (store.screenshotsAllowed) {
-            store.screenshotsAllowed = false
+        if (captureSession.isAllowed) {
+            captureSession.background()
             updateCaptureSecurity()
+            refreshPrivacyOnResume = true
         }
         super.onStop()
     }
