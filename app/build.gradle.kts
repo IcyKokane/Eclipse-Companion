@@ -10,17 +10,17 @@ android {
         applicationId = "dev.privatecompanion.eclipse"
         minSdk = 28
         targetSdk = 35
-        versionCode = 7
-        versionName = "0.4.3"
+        versionCode = 8
+        versionName = "0.4.4"
         ndk { abiFilters += listOf("arm64-v8a") }
         externalNativeBuild { cmake { cppFlags += listOf("-std=c++17", "-O2") } }
     }
     buildTypes {
         getByName("debug") {
             // Separate install keeps the existing companion and its private data untouched.
-            applicationIdSuffix = ".preview43"
+            applicationIdSuffix = ".preview44"
             versionNameSuffix = "-ui-test"
-            resValue("string", "app_name", "Eclipse UI Test 0.4.3")
+            resValue("string", "app_name", "Eclipse Chat Test 0.4.4")
         }
         getByName("release") {
             isMinifyEnabled = false
