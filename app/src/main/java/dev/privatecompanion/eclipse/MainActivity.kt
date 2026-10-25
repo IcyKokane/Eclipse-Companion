@@ -9,6 +9,7 @@ import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Bundle
+import android.os.Build
 import android.os.Environment
 import android.text.Editable
 import android.text.TextWatcher
@@ -16,6 +17,8 @@ import android.text.InputType
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
+import android.view.WindowInsets
+import android.view.WindowInsetsController
 import android.view.WindowManager
 import android.widget.Button
 import android.widget.EditText
@@ -66,6 +69,7 @@ class MainActivity : Activity() {
                 .setCancelable(false).setPositiveButton("Close") { _, _ -> finish() }.show()
             return
         }
+        updateCaptureSecurity()
         runCatching { ModelFiles.recover(filesDir) }.onFailure {
             status = "Previous model recovery needs attention: ${it.message}"
         }
@@ -131,13 +135,53 @@ class MainActivity : Activity() {
             text = "Close app"
             setOnClickListener { finish() }
         })
+        applySafeInsets(view)
         setContentView(view)
     }
+
+    /** Android 15+ places content behind status, cutout and navigation bars. */
+    private fun applySafeInsets(view: View) {
+        if (Build.VERSION.SDK_INT >= 35) {
+            view.setOnApplyWindowInsetsListener { target, insets ->
+                val safe = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout())
+                target.setPadding(safe.left, safe.top, safe.right, safe.bottom)
+                insets
+            }
+            view.requestApplyInsets()
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            window.insetsController?.setSystemBarsAppearance(0,
+                WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or
+                    WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS)
+        }
+    }
+
+    private fun updateCaptureSecurity() {
+        if (store.screenshotsAllowed) window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        else window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+    }
+
+    private fun setScreenshotsAllowed(allow: Boolean) {
+        val before = store.screenshotsAllowed
+        if (!allow) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        store.screenshotsAllowed = allow
+        try {
+            store.save()
+            updateCaptureSecurity()
+            render()
+        } catch (e: Exception) {
+            store.screenshotsAllowed = before
+            updateCaptureSecurity()
+            toast("Could not save screenshot setting: ${e.message}")
+        }
+    }
+
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density + 0.5f).toInt()
 
     private fun bg(color: Int, radius: Float = 20f): GradientDrawable =
         GradientDrawable().apply { setColor(color); cornerRadius = radius }
 
-    private fun pad(v: View, x: Int = 18, y: Int = 12) = v.setPadding(x, y, x, y)
+    private fun pad(v: View, x: Int = 18, y: Int = 12) = v.setPadding(dp(x), dp(y), dp(x), dp(y))
 
     private fun label(text: String, size: Float = 16f, color: Int = light, bold: Boolean = false): TextView =
         TextView(this).apply {
@@ -145,7 +189,7 @@ class MainActivity : Activity() {
             textSize = size
             setTextColor(color)
             if (bold) setTypeface(null, Typeface.BOLD)
-            setPadding(4, 8, 4, 8)
+            setPadding(dp(4), dp(8), dp(4), dp(8))
         }
 
     private fun input(text: String = "", hint: String = "", lines: Int = 1): EditText = EditText(this).apply {
@@ -160,37 +204,53 @@ class MainActivity : Activity() {
 
     private fun button(title: String, onClick: () -> Unit): Button = Button(this).apply {
         text = title
-        textSize = 13f
+        textSize = 14f
         isAllCaps = false
+        maxLines = 2
+        gravity = Gravity.CENTER
+        minimumWidth = 0
+        minimumHeight = dp(48)
+        setPadding(dp(10), dp(7), dp(10), dp(7))
         setTextColor(Color.WHITE)
-        background = bg(Color.rgb(100, 68, 151), 17f)
+        // Avoid OEM themes tinting the button into an opaque white rectangle.
+        backgroundTintList = null
+        background = bg(Color.rgb(100, 68, 151), dp(12).toFloat())
+        stateListAnimator = null
         setOnClickListener { onClick() }
     }
 
     private fun section(title: String) { content.addView(label(title, 21f, light, true)) }
 
-    private fun space(height: Int = 12) { content.addView(View(this), LinearLayout.LayoutParams(1, height)) }
+    private fun space(height: Int = 12) { content.addView(View(this), LinearLayout.LayoutParams(1, dp(height))) }
 
     private fun showUi() {
         if (!store.ageConfirmed) return
         root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(dark) }
+        applySafeInsets(root)
         setContentView(root)
-        val titleBar = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; pad(this, 20, 10) }
+        val titleBar = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; pad(this, 16, 6) }
         titleBar.addView(label("ECLIPSE  ·  PRIVATE COMPANION", 17f, light, true))
-        titleBar.addView(label("Offline only  •  Chat history encrypted on this device", 12f, muted))
+        titleBar.addView(label("Offline only  •  On-device conversations", 12f, muted))
         root.addView(titleBar)
-        val tabs = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; pad(this, 8, 2) }
-        listOf("Chat", "Personality", "Appearance", "Privacy").forEach { name ->
-            val b = button(name) { pane = name; render() }
-            val lp = LinearLayout.LayoutParams(0, 52, 1f).apply { setMargins(2, 0, 2, 0) }
-            tabs.addView(b, lp)
+        // Two-column tabs remain legible on narrow screens and with larger fonts.
+        val tabs = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; pad(this, 8, 2) }
+        listOf(listOf("Chat", "Personality"), listOf("Appearance", "Privacy")).forEach { names ->
+            val tabRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+            names.forEach { name ->
+                val tab = button(name) { pane = name; render() }
+                if (pane == name) tab.background = bg(Color.rgb(125, 86, 184), dp(12).toFloat())
+                tabRow.addView(tab, LinearLayout.LayoutParams(0, dp(52), 1f).apply {
+                    setMargins(dp(3), dp(2), dp(3), dp(2))
+                })
+            }
+            tabs.addView(tabRow)
         }
         root.addView(tabs)
         val scroll = ScrollView(this).apply { isFillViewport = true }
         chatScroll = scroll
         content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(18, 8, 18, 30)
+            setPadding(dp(16), dp(8), dp(16), dp(28))
         }
         scroll.addView(content)
         root.addView(scroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
