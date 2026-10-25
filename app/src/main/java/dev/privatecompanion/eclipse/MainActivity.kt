@@ -135,7 +135,7 @@ class MainActivity : Activity() {
             tabs.addView(b, lp)
         }
         root.addView(tabs)
-        val scroll = ScrollView(this).apply { fillViewport = true }
+        val scroll = ScrollView(this).apply { isFillViewport = true }
         chatScroll = scroll
         content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
