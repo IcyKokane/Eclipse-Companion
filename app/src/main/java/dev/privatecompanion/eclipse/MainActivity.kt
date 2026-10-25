@@ -550,6 +550,28 @@ class MainActivity : Activity() {
     }
 
     private fun privacyPane() {
+        section("Screen capture")
+        content.addView(label(
+            "Screenshots and screen recording are blocked by default for privacy. " +
+                "You may allow them temporarily to report display problems. Turn protection on afterward.",
+            13f, muted
+        ))
+        content.addView(button(
+            if (store.screenshotsAllowed) "Screen capture: ALLOWED  •  Tap to block"
+            else "Screen capture: BLOCKED  •  Tap to allow"
+        ) {
+            if (store.screenshotsAllowed) {
+                setScreenshotsAllowed(false)
+            } else {
+                AlertDialog.Builder(this)
+                    .setTitle("Allow screen capture?")
+                    .setMessage("Screenshots, screen recordings and recent-app previews may expose visible conversations. Use only for troubleshooting.")
+                    .setNegativeButton("Cancel", null)
+                    .setPositiveButton("Allow") { _, _ -> setScreenshotsAllowed(true) }
+                    .show()
+            }
+        })
+        space(18)
         section("Local model & privacy")
         content.addView(label("The app has no INTERNET permission. No account or API key is used. Load a compatible local GGUF instruct/chat model for responses.", 14f, muted))
         space()
@@ -583,28 +605,6 @@ class MainActivity : Activity() {
                 .setPositiveButton("Enable") { _, _ ->
                     store.profile = store.profile.copy(adultMode = true); store.save(); render()
                 }.show()
-        })
-        space(18)
-        section("Screen capture")
-        content.addView(label(
-            "Screenshots and screen recording are blocked by default for privacy. " +
-                "You may allow them temporarily to report display problems. Turn protection on afterward.",
-            13f, muted
-        ))
-        content.addView(button(
-            if (store.screenshotsAllowed) "Screen capture: ALLOWED  •  Tap to block"
-            else "Screen capture: BLOCKED  •  Tap to allow"
-        ) {
-            if (store.screenshotsAllowed) {
-                setScreenshotsAllowed(false)
-            } else {
-                AlertDialog.Builder(this)
-                    .setTitle("Allow screen capture?")
-                    .setMessage("Screenshots, screen recordings and recent-app previews may expose visible conversations. Use only for troubleshooting.")
-                    .setNegativeButton("Cancel", null)
-                    .setPositiveButton("Allow") { _, _ -> setScreenshotsAllowed(true) }
-                    .show()
-            }
         })
         space(18)
         section("Your data")
