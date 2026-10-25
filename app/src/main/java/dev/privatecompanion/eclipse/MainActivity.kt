@@ -49,6 +49,8 @@ class MainActivity : Activity() {
     private var conversationRevision = 0L
     private val replyGate = ReplySessionGate()
     private var draftText = ""
+    // Screenshot permission is session-only; never save it alongside private conversations.
+    private var captureAllowedThisSession = false
     private var modelBusy = false
     private var pane = "Chat"
     private var status = "Import a GGUF model to begin private AI conversations."
@@ -76,7 +78,7 @@ class MainActivity : Activity() {
             return
         }
         // Allow screenshots only for the current session; relaunch always starts private.
-        store.screenshotsAllowed = false
+        captureAllowedThisSession = false
         updateCaptureSecurity()
         runCatching { ModelFiles.recover(filesDir) }.onFailure {
             status = "Previous model recovery needs attention: ${it.message}"
@@ -175,23 +177,14 @@ class MainActivity : Activity() {
     }
 
     private fun updateCaptureSecurity() {
-        if (store.screenshotsAllowed) window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        if (captureAllowedThisSession) window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
         else window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
     }
 
     private fun setScreenshotsAllowed(allow: Boolean) {
-        val before = store.screenshotsAllowed
-        if (!allow) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
-        store.screenshotsAllowed = allow
-        try {
-            store.save()
-            updateCaptureSecurity()
-            render()
-        } catch (e: Exception) {
-            store.screenshotsAllowed = before
-            updateCaptureSecurity()
-            toast("Could not save screenshot setting: ${e.message}")
-        }
+        captureAllowedThisSession = allow
+        updateCaptureSecurity()
+        render()
     }
 
     /** Diagnostic information contains layout metrics only, not chat/profile/model content. */
@@ -204,7 +197,7 @@ class MainActivity : Activity() {
             Density: ${display.density}
             Font scale: ${resources.configuration.fontScale}
             Window padding px: ${lastAppliedPadding.left}, ${lastAppliedPadding.top}, ${lastAppliedPadding.right}, ${lastAppliedPadding.bottom}
-            Screen capture allowed this session: ${store.screenshotsAllowed}
+            Screen capture allowed this session: ${captureAllowedThisSession}
         """.trimIndent()
         val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         clipboard.setPrimaryClip(ClipData.newPlainText("Eclipse UI diagnostics", detail))
@@ -651,10 +644,10 @@ class MainActivity : Activity() {
             13f, muted
         ))
         content.addView(button(
-            if (store.screenshotsAllowed) "Screen capture: ALLOWED  •  Tap to block"
+            if (captureAllowedThisSession) "Screen capture: ALLOWED  •  Tap to block"
             else "Screen capture: BLOCKED  •  Tap to allow"
         ) {
-            if (store.screenshotsAllowed) {
+            if (captureAllowedThisSession) {
                 setScreenshotsAllowed(false)
             } else {
                 AlertDialog.Builder(this)
@@ -841,8 +834,8 @@ class MainActivity : Activity() {
             status = "Generation stopped when Eclipse left the foreground. Retry when ready."
         }
         // Avoid capturing sensitive content in the recent-apps view once Eclipse is backgrounded.
-        if (store.screenshotsAllowed) {
-            store.screenshotsAllowed = false
+        if (captureAllowedThisSession) {
+            captureAllowedThisSession = false
             updateCaptureSecurity()
         }
         super.onStop()
