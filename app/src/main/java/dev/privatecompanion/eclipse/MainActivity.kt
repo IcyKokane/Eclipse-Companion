@@ -41,6 +41,7 @@ class MainActivity : Activity() {
     private lateinit var root: LinearLayout
     private lateinit var content: LinearLayout
     private lateinit var chatScroll: ScrollView
+    private lateinit var composerDock: LinearLayout
     private var composerEdit: EditText? = null
     private val navigationButtons = linkedMapOf<String, Button>()
     private var lastAppliedPadding = EdgePadding(0, 0, 0, 0)
@@ -292,6 +293,15 @@ class MainActivity : Activity() {
         }
         scroll.addView(content)
         root.addView(scroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+        // Composer stays visible above keyboard, separate from scrollable chat history.
+        composerDock = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(dark)
+            setPadding(dp(12), dp(4), dp(12), dp(8))
+        }
+        root.addView(composerDock, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+        ))
         render()
     }
 
@@ -320,21 +330,20 @@ class MainActivity : Activity() {
 
     private fun render() {
         content.removeAllViews()
+        composerDock.removeAllViews()
         composerEdit = null
         when (pane) {
-            "Chat" -> chatPane()
-            "Personality" -> personalityPane()
-            "Appearance" -> appearancePane()
-            else -> privacyPane()
+            "Chat" -> {
+                chatPane()
+                composerPane()
+                composerDock.visibility = View.VISIBLE
+            }
+            "Personality" -> { composerDock.visibility = View.GONE; personalityPane() }
+            "Appearance" -> { composerDock.visibility = View.GONE; appearancePane() }
+            else -> { composerDock.visibility = View.GONE; privacyPane() }
         }
         if (pane == "Chat") chatScroll.post {
-            if (pane == "Chat") {
-                // For long chats, reveal the composer instead of scrolling past Send to suggestions.
-                val position = if (store.messages.isNotEmpty()) {
-                    ((composerEdit?.top ?: 0) - dp(72)).coerceAtLeast(0)
-                } else 0
-                chatScroll.scrollTo(0, position)
-            }
+            if (pane == "Chat") chatScroll.fullScroll(View.FOCUS_DOWN)
         }
     }
 
@@ -369,7 +378,11 @@ class MainActivity : Activity() {
             space(4)
         }
         if (store.messages.isEmpty()) {
-            content.addView(label("Your conversation begins here. Import and load an on-device model, then say hello.", 15f, muted))
+            content.addView(label(
+                "Your conversation starts here. Import and load a local GGUF model in Privacy, " +
+                    "then use the Ideas button beside Send to pick a first message.",
+                15f, muted
+            ))
         }
         for (m in store.messages.takeLast(50)) {
             val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; pad(this, 13, 10) }
@@ -379,7 +392,15 @@ class MainActivity : Activity() {
             content.addView(box, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 9 })
         }
         if (store.messages.size > 50) content.addView(label("Showing the most recent 50 messages. Older messages remain saved locally.", 12f, muted))
-        val edit = input(draftText, "Type a message to ${store.profile.name}...", 3)
+
+    }
+
+    /** Fixed chat input, not inside the message ScrollView. Remains reachable with the keyboard. */
+    private fun composerPane() {
+        val edit = input(draftText, "Type a message to ${store.profile.name}...", 2).apply {
+            maxLines = 4
+            minLines = 2
+        }
         composerEdit = edit
         edit.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
@@ -388,9 +409,10 @@ class MainActivity : Activity() {
             }
             override fun afterTextChanged(s: Editable?) {}
         })
-        content.addView(edit, LinearLayout.LayoutParams(-1, -2))
-        space(8)
-        val send = button(if (sending) "Thinking on device..." else "Send message") {
+        composerDock.addView(edit, LinearLayout.LayoutParams(-1, -2))
+        val actions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        val actionState = ComposerPolicy.evaluate(sending, modelBusy, store.messages.lastOrNull()?.role)
+        val send = button(if (sending) "Thinking..." else "Send message") {
             if (sending || modelBusy) return@button
             if (!LocalModel.ready()) { toast("Load a GGUF model in Privacy first."); return@button }
             val userText = edit.text.toString().trim().take(3000)
@@ -405,32 +427,38 @@ class MainActivity : Activity() {
             conversationRevision++
             startReply()
         }
-        send.isEnabled = !sending && !modelBusy
-        content.addView(send, LinearLayout.LayoutParams(-1, dp(52)))
-        space(8)
-        if (!sending && store.messages.lastOrNull()?.role == "user") {
-            content.addView(button("Generate/retry reply to last message") { startReply() },
-                LinearLayout.LayoutParams(-1, dp(52)).apply { bottomMargin = dp(7) })
+        send.isEnabled = actionState.sendEnabled
+        actions.addView(send, LinearLayout.LayoutParams(0, dp(52), 2f).apply {
+            rightMargin = dp(6)
+        })
+        actions.addView(button("Ideas") { showStarterDialog() },
+            LinearLayout.LayoutParams(0, dp(52), 1f))
+        composerDock.addView(actions)
+        if (actionState.showRetry) {
+            composerDock.addView(button("Generate/retry reply to last message") { startReply() },
+                LinearLayout.LayoutParams(-1, dp(48)))
         }
-        if (sending) {
-            content.addView(button("Stop current response") {
+        if (actionState.showStop) {
+            composerDock.addView(button("Stop current response") {
                 replyGate.cancel()
                 LocalModel.cancel()
                 status = "Stopping local generation..."
                 if (pane == "Chat") render()
-            }, LinearLayout.LayoutParams(-1, dp(52)).apply { bottomMargin = dp(7) })
+            }, LinearLayout.LayoutParams(-1, dp(48)))
         }
-        space(8)
-        content.addView(label("Conversation ideas · prepared on device (tap to edit)", 12f, muted))
-        val dateIndex = System.currentTimeMillis() / 86_400_000L
-        CompanionLogic.dailyStarters(store.profile, dateIndex).forEach { idea ->
-            content.addView(button(idea.title) {
-                edit.setText(idea.message)
+    }
+
+    private fun showStarterDialog() {
+        val ideas = CompanionLogic.dailyStarters(store.profile, System.currentTimeMillis() / 86_400_000L)
+        AlertDialog.Builder(this).setTitle("Conversation ideas")
+            .setItems(ideas.map { it.title }.toTypedArray()) { _, selected ->
+                val edit = composerEdit ?: return@setItems
+                edit.setText(ideas[selected].message)
                 edit.setSelection(edit.text.length)
                 edit.requestFocus()
-            }, LinearLayout.LayoutParams(-1, dp(50)).apply { bottomMargin = dp(5) })
-        }
-        space(8)
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     private fun startReply() {
