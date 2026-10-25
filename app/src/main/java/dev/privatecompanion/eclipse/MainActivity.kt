@@ -26,6 +26,7 @@ import android.view.WindowManager
 import android.widget.Button
 import android.widget.EditText
 import android.widget.ImageView
+import android.view.inputmethod.InputMethodManager
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.SeekBar
@@ -40,6 +41,7 @@ class MainActivity : Activity() {
     private lateinit var root: LinearLayout
     private lateinit var content: LinearLayout
     private lateinit var chatScroll: ScrollView
+    private var composerEdit: EditText? = null
     private val navigationButtons = linkedMapOf<String, Button>()
     private var lastAppliedPadding = EdgePadding(0, 0, 0, 0)
     private var sending = false
@@ -296,6 +298,13 @@ class MainActivity : Activity() {
     /** Always reveal a new settings page from the top, and highlight the actual active tab. */
     private fun navigateTo(name: String) {
         if (name !in navigationButtons) return
+        if (name != pane) {
+            currentFocus?.let { field ->
+                (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager)
+                    .hideSoftInputFromWindow(field.windowToken, 0)
+                field.clearFocus()
+            }
+        }
         pane = name
         for ((tabName, button) in navigationButtons) {
             button.background = bg(
@@ -311,13 +320,22 @@ class MainActivity : Activity() {
 
     private fun render() {
         content.removeAllViews()
+        composerEdit = null
         when (pane) {
             "Chat" -> chatPane()
             "Personality" -> personalityPane()
             "Appearance" -> appearancePane()
             else -> privacyPane()
         }
-        if (pane == "Chat") chatScroll.post { if (pane == "Chat") chatScroll.fullScroll(View.FOCUS_DOWN) }
+        if (pane == "Chat") chatScroll.post {
+            if (pane == "Chat") {
+                // For long chats, reveal the composer instead of scrolling past Send to suggestions.
+                val position = if (store.messages.isNotEmpty()) {
+                    ((composerEdit?.top ?: 0) - dp(72)).coerceAtLeast(0)
+                } else 0
+                chatScroll.scrollTo(0, position)
+            }
+        }
     }
 
     private fun chatPane() {
@@ -362,6 +380,7 @@ class MainActivity : Activity() {
         }
         if (store.messages.size > 50) content.addView(label("Showing the most recent 50 messages. Older messages remain saved locally.", 12f, muted))
         val edit = input(draftText, "Type a message to ${store.profile.name}...", 3)
+        composerEdit = edit
         edit.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
@@ -371,28 +390,6 @@ class MainActivity : Activity() {
         })
         content.addView(edit, LinearLayout.LayoutParams(-1, -2))
         space(8)
-        content.addView(label("Conversation ideas · prepared on device (tap to edit)", 12f, muted))
-        val dateIndex = System.currentTimeMillis() / 86_400_000L
-        CompanionLogic.dailyStarters(store.profile, dateIndex).forEach { idea ->
-            content.addView(button(idea.title) {
-                edit.setText(idea.message)
-                edit.setSelection(edit.text.length)
-                edit.requestFocus()
-            }, LinearLayout.LayoutParams(-1, dp(50)).apply { bottomMargin = dp(5) })
-        }
-        space(8)
-        if (!sending && store.messages.lastOrNull()?.role == "user") {
-            content.addView(button("Generate/retry reply to last message") { startReply() },
-                LinearLayout.LayoutParams(-1, dp(52)).apply { bottomMargin = dp(7) })
-        }
-        if (sending) {
-            content.addView(button("Stop current response") {
-                replyGate.cancel()
-                LocalModel.cancel()
-                status = "Stopping local generation..."
-                if (pane == "Chat") render()
-            }, LinearLayout.LayoutParams(-1, dp(52)).apply { bottomMargin = dp(7) })
-        }
         val send = button(if (sending) "Thinking on device..." else "Send message") {
             if (sending || modelBusy) return@button
             if (!LocalModel.ready()) { toast("Load a GGUF model in Privacy first."); return@button }
@@ -410,6 +407,30 @@ class MainActivity : Activity() {
         }
         send.isEnabled = !sending && !modelBusy
         content.addView(send, LinearLayout.LayoutParams(-1, dp(52)))
+        space(8)
+        if (!sending && store.messages.lastOrNull()?.role == "user") {
+            content.addView(button("Generate/retry reply to last message") { startReply() },
+                LinearLayout.LayoutParams(-1, dp(52)).apply { bottomMargin = dp(7) })
+        }
+        if (sending) {
+            content.addView(button("Stop current response") {
+                replyGate.cancel()
+                LocalModel.cancel()
+                status = "Stopping local generation..."
+                if (pane == "Chat") render()
+            }, LinearLayout.LayoutParams(-1, dp(52)).apply { bottomMargin = dp(7) })
+        }
+        space(8)
+        content.addView(label("Conversation ideas · prepared on device (tap to edit)", 12f, muted))
+        val dateIndex = System.currentTimeMillis() / 86_400_000L
+        CompanionLogic.dailyStarters(store.profile, dateIndex).forEach { idea ->
+            content.addView(button(idea.title) {
+                edit.setText(idea.message)
+                edit.setSelection(edit.text.length)
+                edit.requestFocus()
+            }, LinearLayout.LayoutParams(-1, dp(50)).apply { bottomMargin = dp(5) })
+        }
+        space(8)
     }
 
     private fun startReply() {
@@ -797,6 +818,11 @@ class MainActivity : Activity() {
             replyGate.cancel()
             LocalModel.cancel()
             status = "Generation stopped when Eclipse left the foreground. Retry when ready."
+        }
+        // Avoid capturing sensitive content in the recent-apps view once Eclipse is backgrounded.
+        if (store.screenshotsAllowed) {
+            store.screenshotsAllowed = false
+            updateCaptureSecurity()
         }
         super.onStop()
     }
