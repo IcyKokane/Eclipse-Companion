@@ -3,6 +3,9 @@ package dev.privatecompanion.eclipse
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.Intent
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.Typeface
@@ -37,6 +40,8 @@ class MainActivity : Activity() {
     private lateinit var root: LinearLayout
     private lateinit var content: LinearLayout
     private lateinit var chatScroll: ScrollView
+    private val navigationButtons = linkedMapOf<String, Button>()
+    private var lastAppliedPadding = EdgePadding(0, 0, 0, 0)
     private var sending = false
     private var conversationRevision = 0L
     private val replyGate = ReplySessionGate()
@@ -67,6 +72,8 @@ class MainActivity : Activity() {
                 .setCancelable(false).setPositiveButton("Close") { _, _ -> finish() }.show()
             return
         }
+        // Allow screenshots only for the current session; relaunch always starts private.
+        store.screenshotsAllowed = false
         updateCaptureSecurity()
         runCatching { ModelFiles.recover(filesDir) }.onFailure {
             status = "Previous model recovery needs attention: ${it.message}"
@@ -138,12 +145,21 @@ class MainActivity : Activity() {
         view.requestApplyInsets()
     }
 
-    /** Android 15+ places content behind status, cutout and navigation bars. */
+    /** Preserve view margins while reserving status/cutout, navigation and keyboard insets. */
     private fun applySafeInsets(view: View) {
         if (Build.VERSION.SDK_INT >= 35) {
+            val original = EdgePadding(view.paddingLeft, view.paddingTop, view.paddingRight, view.paddingBottom)
             view.setOnApplyWindowInsetsListener { target, insets ->
                 val safe = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout())
-                target.setPadding(safe.left, safe.top, safe.right, safe.bottom)
+                val keyboard = insets.getInsets(WindowInsets.Type.ime())
+                val padding = MobileWindowPadding.resolve(
+                    initial = original,
+                    safeArea = EdgePadding(safe.left, safe.top, safe.right, safe.bottom),
+                    keyboardBottom = keyboard.bottom,
+                    keyboardVisible = insets.isVisible(WindowInsets.Type.ime())
+                )
+                lastAppliedPadding = padding
+                target.setPadding(padding.left, padding.top, padding.right, padding.bottom)
                 insets
             }
             view.requestApplyInsets()
@@ -173,6 +189,23 @@ class MainActivity : Activity() {
             updateCaptureSecurity()
             toast("Could not save screenshot setting: ${e.message}")
         }
+    }
+
+    /** Diagnostic information contains layout metrics only, not chat/profile/model content. */
+    private fun copyLayoutDiagnostics() {
+        val display = resources.displayMetrics
+        val detail = """
+            Eclipse Companion UI Preview 0.4.3
+            Android SDK: ${Build.VERSION.SDK_INT}
+            Display pixels: ${display.widthPixels} x ${display.heightPixels}
+            Density: ${display.density}
+            Font scale: ${resources.configuration.fontScale}
+            Window padding px: ${lastAppliedPadding.left}, ${lastAppliedPadding.top}, ${lastAppliedPadding.right}, ${lastAppliedPadding.bottom}
+            Screen capture allowed this session: ${store.screenshotsAllowed}
+        """.trimIndent()
+        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        clipboard.setPrimaryClip(ClipData.newPlainText("Eclipse UI diagnostics", detail))
+        toast("UI diagnostics copied (no chats or private memories)")
     }
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density + 0.5f).toInt()
