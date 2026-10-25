@@ -15,11 +15,13 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - uses: android-actions/setup-android@v3
+      # Ubuntu GitHub runners provide Android command-line tools; do not request the obsolete 'tools' SDK package.
       - name: Install SDK and native build tools
         run: |
-          yes | sdkmanager --licenses >/dev/null || true
-          sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'ndk;27.2.12479018' 'cmake;3.22.1'
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -path '*/bin/sdkmanager' -print -quit)"
+          test -x "$SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" 'platforms;android-35' 'build-tools;35.0.0' 'ndk;27.2.12479018' 'cmake;3.22.1'
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
