@@ -1,4 +1,27 @@
-# Eclipse Companion · Android V0.4.2 UI preview
+# Eclipse Companion · Android V0.4.3 Mobile Layout Test
+
+**V0.4.3 is an Android debug preview for testing, not a verified stable Android release.**
+
+The code now preserves the status/cutout/navigation safe areas, responds to Android 15/16 IME (on-screen keyboard) insets, keeps the Send/Stop/Retry controls above prepared conversation ideas, repositions long conversations to the composer, resets settings pages to the top, and highlights the selected navigation tab.
+
+**Screenshot safety:** screen capture still starts blocked. Privacy → Screen capture permits temporary troubleshooting, but the app re-enables its screen-capture block on backgrounding and on relaunch. Privacy → **Copy UI layout diagnostics** puts screen dimensions, Android SDK, font scale and safe-area padding on the clipboard; no conversations, companion memories or GGUF data are included.
+
+**Safe side-by-side installation:** the V0.4.3 Android debug APK is packaged as `dev.privatecompanion.eclipse.preview43`, launcher **Eclipse UI Test 0.4.3**. It does not overwrite the existing V0.4.1 main app or V0.4.2 preview. Its private data is separate; imported models and conversations do not migrate. This avoids requiring the user to uninstall an app because debug signing keys change between CI runs.
+
+**Verification:** Kotlin/JVM tests include `MobileWindowPaddingTest` covering 6 cases: portrait navbar, keyboard opened, keyboard closed, notch with fallback-screen padding, landscape side insets and invalid negative measurements. GitHub Actions compiles the Android APK with arm64 inference library and rejects INTERNET permission. A real-device visual check is still needed to establish whether OEM white rectangles and status bar clipping are fully resolved.
+
+### Android test checklist
+
+1. Install **Eclipse UI Test 0.4.3** without uninstalling previous versions.
+2. Verify the four tabs and headers clear the status bar and camera cutout in portrait/landscape.
+3. Check text and buttons on each screen; test keyboard open/closed while editing.
+4. Confirm Send and Stop/Retry are directly below the chat composer.
+5. Go to Privacy; verify it opens at the top, allow a screenshot, capture the issue and return to the app. Protection should be restored after switching away and back.
+6. Use **Copy UI layout diagnostics** if any content remains clipped or a white rectangle persists.
+
+---
+
+## V0.4.2 UI preview (previous milestone)
 
 **Android 16 interface correction and private screenshot troubleshooting** (test build; requires device verification).
 
