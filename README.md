@@ -1,8 +1,10 @@
-# Eclipse Companion · Android V0.4.0 (CI-built debug APK milestone)
+# Eclipse Companion · Android V0.4.1 (startup recovery candidate)
 
 A **private, offline-first Android AI companion for consenting adults 18+**. This is a standalone project, not part of The Fool, Icarus, Vesper, or any other agent. The Android application includes native Kotlin UI and a local C++ llama.cpp bridge, and requests **no INTERNET permission**. The owner imports a compatible GGUF file. No accounts, analytics, or API keys.
 
-**Release status: FIRST CI-BUILT DEBUG APK.** GitHub Actions run [40224719071](https://github.com/IcyKokane/Eclipse-Companion/actions/runs/40224719071) passed Android compilation, JVM tests, native arm64 library and offline-permission checks. Download the `EclipseCompanion-v0.4-debug-apk` artifact from that run or install the independently extracted `Eclipse_Companion_v0.4_Debug.apk` provided with the release. **No GGUF model is bundled; Android-device chat, performance, image import and cancellation are not yet tested.** The debug build targets Android 28+ arm64.
+**V0.4.1 startup recovery:** The first physical-device recording showed the 18+ screen followed by an unexpected return to the Android launcher. Its exact cause is not established without device crash logs. This patch catches age-confirmation secure-store failures and interface startup exceptions, displays a recoverable error view, and tolerates portrait-rendering failures. The age-confirmation flag now rolls back in memory if encryption/persistence fails. The patch must still pass Android CI and on-device validation before calling the issue resolved.
+
+**V0.4.0 historical release: FIRST CI-BUILT DEBUG APK.** GitHub Actions run [40224719071](https://github.com/IcyKokane/Eclipse-Companion/actions/runs/40224719071) passed Android compilation, JVM tests, native arm64 library and offline-permission checks. Download the `EclipseCompanion-v0.4-debug-apk` artifact from that run or install the independently extracted `Eclipse_Companion_v0.4_Debug.apk` provided with the release. **No GGUF model is bundled; Android-device chat, performance, image import and cancellation are not yet tested.** The debug build targets Android 28+ arm64.
 
 ## What's new in V0.4
 
