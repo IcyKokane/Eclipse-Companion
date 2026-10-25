@@ -113,7 +113,7 @@ class MainActivity : Activity() {
             setTextColor(Color.WHITE)
         })
         view.addView(TextView(this).apply {
-            text = "$stage failed (\u0024{error.javaClass.simpleName}). " +
+            text = "$stage failed (${error.javaClass.simpleName}). " +
                 "Your existing chats and model have not been cleared. " +
                 "Retry, or close Eclipse Companion and report this error.\n\n" +
                 (error.message?.take(200) ?: "No additional error message was provided.")
