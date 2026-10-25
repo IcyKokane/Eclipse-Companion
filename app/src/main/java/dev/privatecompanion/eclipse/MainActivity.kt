@@ -424,7 +424,7 @@ class MainActivity : Activity() {
         actions.addView(button("Ideas") { showConversationIdeas(edit) },
             LinearLayout.LayoutParams(0, dp(52), 1f))
         composerBar.addView(actions)
-        space(8)
+        composerBar.addView(View(this), LinearLayout.LayoutParams(1, dp(8)))
         if (!sending && store.messages.lastOrNull()?.role == "user") {
             composerBar.addView(button("Generate/retry reply to last message") { startReply() },
                 LinearLayout.LayoutParams(-1, dp(52)).apply { bottomMargin = dp(7) })
