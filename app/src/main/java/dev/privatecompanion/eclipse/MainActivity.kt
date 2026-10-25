@@ -69,7 +69,7 @@ class MainActivity : Activity() {
         runCatching { ModelFiles.recover(filesDir) }.onFailure {
             status = "Previous model recovery needs attention: ${it.message}"
         }
-        if (store.ageConfirmed) showUi() else showAgeGate()
+        if (store.ageConfirmed) openUiSafely() else showAgeGate()
     }
 
     private fun showAgeGate() {
@@ -79,8 +79,59 @@ class MainActivity : Activity() {
                 "stay on this device. Confirm that you are at least 18 to continue.")
             .setCancelable(false)
             .setNegativeButton("Exit") { _, _ -> finish() }
-            .setPositiveButton("I am 18 or older") { _, _ -> store.confirmAdult(); showUi() }
+            .setPositiveButton("I am 18 or older") { _, _ ->
+                try {
+                    store.confirmAdult()
+                    openUiSafely()
+                } catch (e: Exception) {
+                    showStartupFailure("Saving age confirmation", e)
+                }
+            }
             .show()
+    }
+
+    /** Keep the Activity alive and the encrypted store intact if startup fails. */
+    private fun openUiSafely() {
+        try {
+            showUi()
+        } catch (e: Exception) {
+            showStartupFailure("Opening the companion interface", e)
+        }
+    }
+
+    private fun showStartupFailure(stage: String, error: Exception) {
+        android.util.Log.e("EclipseStartup", stage, error)
+        // A framework-only recovery view avoids depending on the failing chat/portrait UI.
+        val view = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(dark)
+            setPadding(32, 48, 32, 32)
+        }
+        view.addView(TextView(this).apply {
+            text = "Eclipse Companion could not complete startup"
+            textSize = 20f
+            setTextColor(Color.WHITE)
+        })
+        view.addView(TextView(this).apply {
+            text = "$stage failed (\u0024{error.javaClass.simpleName}). " +
+                "Your existing chats and model have not been cleared. " +
+                "Retry, or close Eclipse Companion and report this error.\n\n" +
+                (error.message?.take(200) ?: "No additional error message was provided.")
+            textSize = 15f
+            setTextColor(Color.WHITE)
+            setPadding(0, 20, 0, 24)
+        })
+        view.addView(Button(this).apply {
+            text = "Retry startup"
+            setOnClickListener {
+                if (store.ageConfirmed) openUiSafely() else showAgeGate()
+            }
+        })
+        view.addView(Button(this).apply {
+            text = "Close app"
+            setOnClickListener { finish() }
+        })
+        setContentView(view)
     }
 
     private fun bg(color: Int, radius: Float = 20f): GradientDrawable =
@@ -162,9 +213,15 @@ class MainActivity : Activity() {
         val image = ImageView(this).apply {
             scaleType = ImageView.ScaleType.CENTER_CROP
             val path = File(filesDir, "portrait.png")
-            val portrait = if (path.exists()) BitmapFactory.decodeFile(path.absolutePath)
-                            else AvatarStudio.create(this@MainActivity, store.profile.appearance)
-            setImageBitmap(portrait)
+            val portrait = runCatching {
+                if (path.exists()) BitmapFactory.decodeFile(path.absolutePath)
+                    ?: AvatarStudio.create(this@MainActivity, store.profile.appearance)
+                else AvatarStudio.create(this@MainActivity, store.profile.appearance)
+            }.onFailure {
+                android.util.Log.e("EclipseStartup", "Portrait unavailable; using fallback icon", it)
+            }.getOrNull()
+            if (portrait != null) setImageBitmap(portrait)
+            else setImageResource(android.R.drawable.ic_menu_gallery)
             background = bg(panel, 20f)
             clipToOutline = true
         }
