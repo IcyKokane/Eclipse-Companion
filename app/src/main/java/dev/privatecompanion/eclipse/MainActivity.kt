@@ -109,7 +109,7 @@ class MainActivity : Activity() {
         val view = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(dark)
-            setPadding(32, 48, 32, 32)
+            setPadding(dp(24), dp(24), dp(24), dp(24))
         }
         view.addView(TextView(this).apply {
             text = "Eclipse Companion could not complete startup"
@@ -123,7 +123,7 @@ class MainActivity : Activity() {
                 (error.message?.take(200) ?: "No additional error message was provided.")
             textSize = 15f
             setTextColor(Color.WHITE)
-            setPadding(0, 20, 0, 24)
+            setPadding(0, dp(20), 0, dp(24))
         })
         view.addView(Button(this).apply {
             text = "Retry startup"
@@ -285,7 +285,7 @@ class MainActivity : Activity() {
             background = bg(panel, 20f)
             clipToOutline = true
         }
-        header.addView(image, LinearLayout.LayoutParams(116, 116).apply { rightMargin = 16 })
+        header.addView(image, LinearLayout.LayoutParams(dp(84), dp(84)).apply { rightMargin = dp(12) })
         header.addView(LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             addView(label(store.profile.name, 23f, light, true))
@@ -326,12 +326,12 @@ class MainActivity : Activity() {
                 edit.setText(idea.message)
                 edit.setSelection(edit.text.length)
                 edit.requestFocus()
-            }, LinearLayout.LayoutParams(-1, 45).apply { bottomMargin = 5 })
+            }, LinearLayout.LayoutParams(-1, dp(50)).apply { bottomMargin = dp(5) })
         }
         space(8)
         if (!sending && store.messages.lastOrNull()?.role == "user") {
             content.addView(button("Generate/retry reply to last message") { startReply() },
-                LinearLayout.LayoutParams(-1, 48).apply { bottomMargin = 7 })
+                LinearLayout.LayoutParams(-1, dp(52)).apply { bottomMargin = dp(7) })
         }
         if (sending) {
             content.addView(button("Stop current response") {
@@ -339,7 +339,7 @@ class MainActivity : Activity() {
                 LocalModel.cancel()
                 status = "Stopping local generation..."
                 if (pane == "Chat") render()
-            }, LinearLayout.LayoutParams(-1, 48).apply { bottomMargin = 7 })
+            }, LinearLayout.LayoutParams(-1, dp(52)).apply { bottomMargin = dp(7) })
         }
         val send = button(if (sending) "Thinking on device..." else "Send message") {
             if (sending || modelBusy) return@button
@@ -357,7 +357,7 @@ class MainActivity : Activity() {
             startReply()
         }
         send.isEnabled = !sending && !modelBusy
-        content.addView(send, LinearLayout.LayoutParams(-1, 52))
+        content.addView(send, LinearLayout.LayoutParams(-1, dp(52)))
     }
 
     private fun startReply() {
@@ -488,20 +488,18 @@ class MainActivity : Activity() {
         })
     }
 
-    private fun dropdown(values: List<String>, selected: String, changed: (String) -> Unit): Spinner {
-        return Spinner(this).apply {
-            adapter = ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, values)
-            setSelection(values.indexOf(selected).coerceAtLeast(0))
-            onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
-                private var initial = true
-                override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}
-                override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: View?, position: Int, id: Long) {
-                    if (initial) { initial = false; return }
-                    changed(values[position])
+    /** Dialog choices avoid OEM white spinner surfaces covering dark text. */
+    private fun dropdown(values: List<String>, selected: String, changed: (String) -> Unit): Button =
+        button("Selected: $selected  •  Tap to change") {
+            AlertDialog.Builder(this)
+                .setTitle("Choose an option")
+                .setSingleChoiceItems(values.toTypedArray(), values.indexOf(selected)) { dialog, index ->
+                    dialog.dismiss()
+                    if (values[index] != selected) changed(values[index])
                 }
-            }
+                .setNegativeButton("Cancel", null)
+                .show()
         }
-    }
 
     private fun appearancePane() {
         section("Appearance Studio")
@@ -513,7 +511,7 @@ class MainActivity : Activity() {
             setImageBitmap(bitmap)
             scaleType = ImageView.ScaleType.CENTER_CROP
         }
-        content.addView(image, LinearLayout.LayoutParams(-1, 330))
+        content.addView(image, LinearLayout.LayoutParams(-1, dp(240)))
         val options = listOf(
             Triple("Hair", listOf("Midnight", "Chestnut", "Blonde", "Silver", "Rose"), store.profile.appearance.hair),
             Triple("Eyes", listOf("Violet", "Blue", "Green", "Amber", "Brown"), store.profile.appearance.eyes),
@@ -585,6 +583,28 @@ class MainActivity : Activity() {
                 .setPositiveButton("Enable") { _, _ ->
                     store.profile = store.profile.copy(adultMode = true); store.save(); render()
                 }.show()
+        })
+        space(18)
+        section("Screen capture")
+        content.addView(label(
+            "Screenshots and screen recording are blocked by default for privacy. " +
+                "You may allow them temporarily to report display problems. Turn protection on afterward.",
+            13f, muted
+        ))
+        content.addView(button(
+            if (store.screenshotsAllowed) "Screen capture: ALLOWED  •  Tap to block"
+            else "Screen capture: BLOCKED  •  Tap to allow"
+        ) {
+            if (store.screenshotsAllowed) {
+                setScreenshotsAllowed(false)
+            } else {
+                AlertDialog.Builder(this)
+                    .setTitle("Allow screen capture?")
+                    .setMessage("Screenshots, screen recordings and recent-app previews may expose visible conversations. Use only for troubleshooting.")
+                    .setNegativeButton("Cancel", null)
+                    .setPositiveButton("Allow") { _, _ -> setScreenshotsAllowed(true) }
+                    .show()
+            }
         })
         space(18)
         section("Your data")
