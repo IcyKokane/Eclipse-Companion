@@ -1,8 +1,10 @@
-# Eclipse Companion · Android V0.4.0 (CI-built debug APK milestone)
+# Eclipse Companion · Android V0.4.1 (startup recovery candidate)
 
 A **private, offline-first Android AI companion for consenting adults 18+**. This is a standalone project, not part of The Fool, Icarus, Vesper, or any other agent. The Android application includes native Kotlin UI and a local C++ llama.cpp bridge, and requests **no INTERNET permission**. The owner imports a compatible GGUF file. No accounts, analytics, or API keys.
 
-**Release status: FIRST CI-BUILT DEBUG APK.** GitHub Actions run [40224719071](https://github.com/IcyKokane/Eclipse-Companion/actions/runs/40224719071) passed Android compilation, JVM tests, native arm64 library and offline-permission checks. Download the `EclipseCompanion-v0.4-debug-apk` artifact from that run or install the independently extracted `Eclipse_Companion_v0.4_Debug.apk` provided with the release. **No GGUF model is bundled; Android-device chat, performance, image import and cancellation are not yet tested.** The debug build targets Android 28+ arm64.
+**V0.4.1 startup repair:** The first physical-device recording showed the 18+ screen followed by an unexpected return to the launcher. Source review found a likely cause: Android Keystore rejects caller-provided AES-GCM IVs for encryption when randomized encryption is required, and V0.4.0 supplied one while saving the age-confirmation flag. V0.4.1 lets Android Keystore generate and return the nonce, preserving the same encrypted-store format for decryption. This version also catches startup errors, displays a retry screen without clearing data, rolls back the in-memory age flag if persistence fails, and tolerates portrait-rendering errors. The specific device failure has not been confirmed with logcat; a rebuilt APK and phone re-test are required to verify the repair.
+
+**V0.4.0 historical release: FIRST CI-BUILT DEBUG APK.** GitHub Actions run [40224719071](https://github.com/IcyKokane/Eclipse-Companion/actions/runs/40224719071) passed Android compilation, JVM tests, native arm64 library and offline-permission checks. Download the `EclipseCompanion-v0.4-debug-apk` artifact from that run or install the independently extracted `Eclipse_Companion_v0.4_Debug.apk` provided with the release. **No GGUF model is bundled; Android-device chat, performance, image import and cancellation are not yet tested.** The debug build targets Android 28+ arm64.
 
 ## What's new in V0.4
 

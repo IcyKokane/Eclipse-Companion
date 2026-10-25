@@ -8,7 +8,6 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.security.KeyStore
-import java.security.SecureRandom
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
@@ -36,7 +35,17 @@ class PrivateStore(private val context: Context) {
         return generator.generateKey()
     }
 
-    fun confirmAdult() { ageConfirmed = true; save() }
+    fun confirmAdult() {
+        if (ageConfirmed) return
+        ageConfirmed = true
+        try {
+            save()
+        } catch (e: Exception) {
+            // A Keystore or disk failure must not leave unsaved confirmation in memory.
+            ageConfirmed = false
+            throw e
+        }
+    }
 
     fun load() {
         if (!file.baseFile.exists()) return
@@ -116,8 +125,11 @@ class PrivateStore(private val context: Context) {
             })
         }
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-        val nonce = ByteArray(12).also { SecureRandom().nextBytes(it) }
-        cipher.init(Cipher.ENCRYPT_MODE, key(), GCMParameterSpec(128, nonce))
+        // AndroidKeyStore forbids caller-supplied GCM IVs for encryption by default.
+        // Let the provider generate a fresh random nonce and persist its 12 bytes.
+        cipher.init(Cipher.ENCRYPT_MODE, key())
+        val nonce = cipher.iv ?: error("Keystore did not generate an IV")
+        require(nonce.size == 12) { "Unexpected Android Keystore GCM IV length" }
         val encrypted = byteArrayOf(1) + nonce + cipher.doFinal(root.toString().toByteArray(Charsets.UTF_8))
         val stream = file.startWrite()
         try { stream.write(encrypted); file.finishWrite(stream) }
