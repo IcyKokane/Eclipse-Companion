@@ -36,7 +36,17 @@ class PrivateStore(private val context: Context) {
         return generator.generateKey()
     }
 
-    fun confirmAdult() { ageConfirmed = true; save() }
+    fun confirmAdult() {
+        if (ageConfirmed) return
+        ageConfirmed = true
+        try {
+            save()
+        } catch (e: Exception) {
+            // A Keystore or disk failure must not leave unsaved confirmation in memory.
+            ageConfirmed = false
+            throw e
+        }
+    }
 
     fun load() {
         if (!file.baseFile.exists()) return
