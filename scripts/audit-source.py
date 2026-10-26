@@ -29,7 +29,7 @@ assert 'Graphic Novel' in activity and 'Monochrome' in activity
 assert 'ECLIPSE_ERROR:' in model
 assert '}.onFailure { error ->' in activity
 assert 'd81235049384534c167caea52b85a694f6103d14' in read('scripts/setup-llama.sh')
-assert 'versionName = "0.4.9"' in read('app/build.gradle.kts')
+assert 'versionName = "0.5.0"' in read('app/build.gradle.kts')
 assert 'android.permission.ACCESS_NETWORK_STATE' not in manifest
 assert 'messages.takeLast(1000)' in secure
 assert 'nativeCancel' in model and 'nativeResetCancel' in model
@@ -43,8 +43,8 @@ assert 'stop_requested.store(true' in read('app/src/main/cpp/bridge.cpp')
 assert 'roles.erase(roles.begin() + 1, roles.begin() + 1 + discard)' in read('app/src/main/cpp/bridge.cpp')
 assert 'llama_sampler_accept' in read('app/src/main/cpp/bridge.cpp')
 assert 'model_previous.bak' in secure
-assert 'versionCode = 13' in read('app/build.gradle.kts')
-assert 'EclipseCompanion-v0.4.9-prefix-cache-apk' in read('.github/workflows/android-debug.yml')
+assert 'versionCode = 14' in read('app/build.gradle.kts')
+assert 'EclipseCompanion-v0.5.0-release-path-test-apk' in read('.github/workflows/android-debug.yml')
 assert 'replyGate.mayCommit(ticket)' in activity
 assert 'replyGate.cancel()' in activity
 assert 'override fun onStop()' in activity
@@ -74,8 +74,8 @@ assert 'setSingleChoiceItems(' in activity
 assert 'Screen capture: ALLOWED' in activity and 'Screen capture: BLOCKED' in activity
 assert '"screenshotsAllowed"' not in secure, 'Screenshot permission must never persist'
 assert 'android:name="dev.privatecompanion.eclipse.MainActivity"' in manifest
-assert 'applicationIdSuffix = ".preview49"' in read('app/build.gradle.kts')
-assert 'Eclipse Cache Test 0.4.9' in read('app/build.gradle.kts')
+assert 'applicationIdSuffix = ".preview50"' in read('app/build.gradle.kts')
+assert 'Eclipse Signing Test 0.5.0' in read('app/build.gradle.kts')
 assert 'WindowInsets.Type.ime()' in activity
 assert 'MobileWindowPadding.resolve(' in activity
 assert 'MobileWindowPaddingTest.kt' in '\n'.join(p.name for p in (root / 'app/src/test/java/dev/privatecompanion/eclipse').glob('*'))
@@ -164,4 +164,28 @@ assert 'lastInferenceDiagnostics = diagnostics' in activity
 assert 'Copy local response performance' in activity
 assert '10 native cache-prefix policy cases' in cache_tests
 assert 'g++ -std=c++17' in ci and 'tests/native/prompt_cache_policy_test.cpp' in ci
-print('PASS: V0.4.9 native prefix reuse, timing, rollback/offline/privacy/build source assertions')
+release_ci = read('.github/workflows/android-owner-release.yml')
+release_policy = read('scripts/verify-release.py')
+gitignore = read('.gitignore')
+assert 'workflow_dispatch:' in release_ci
+assert "github.ref == 'refs/heads/main'" in release_ci
+assert "inputs.confirm_release == 'SIGN'" in release_ci
+assert 'secrets.ECLIPSE_KEYSTORE_B64' in release_ci
+assert 'secrets.ECLIPSE_STORE_PASSWORD' in release_ci
+assert 'secrets.ECLIPSE_KEY_PASSWORD' in release_ci
+assert 'vars.ECLIPSE_CERT_SHA256' in release_ci
+assert 'apksigner" sign' in release_ci
+assert '--cert-sha256' in release_ci and '--version-code 14 --version-name 0.5.0' in release_ci
+assert 'scripts/verify-release.py' in release_ci
+assert 'v0.5.0-alpha1' in release_ci and '--prerelease' in release_ci
+assert 'dev.privatecompanion.eclipse' in release_policy
+assert 'app-release-unsigned.apk' in release_ci
+assert 'android.permission.INTERNET' in release_policy
+assert 'Signer #\\d+' in release_policy
+assert 'lib/arm64-v8a/libeclipse_jni.so' in release_policy
+assert "python3 -m unittest discover -s tests/release" in read('.github/workflows/android-debug.yml')
+assert 'test_untrusted_cert' in read('tests/release/test_verify_release.py')
+assert 'test_unexpected_internet_permission' in read('tests/release/test_verify_release.py')
+assert '*.p12' in gitignore and '*.jks' in gitignore
+assert 'val isDevelopmentPreview = packageName != "dev.privatecompanion.eclipse"' in activity
+print('PASS: V0.5.0 signing protections and inherited offline/privacy/build source checks')
