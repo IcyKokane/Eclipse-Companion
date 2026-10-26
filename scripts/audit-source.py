@@ -29,7 +29,7 @@ assert 'Graphic Novel' in activity and 'Monochrome' in activity
 assert 'ECLIPSE_ERROR:' in model
 assert '}.onFailure { error ->' in activity
 assert 'd81235049384534c167caea52b85a694f6103d14' in read('scripts/setup-llama.sh')
-assert 'versionName = "0.4.5"' in read('app/build.gradle.kts')
+assert 'versionName = "0.4.6"' in read('app/build.gradle.kts')
 assert 'android.permission.ACCESS_NETWORK_STATE' not in manifest
 assert 'messages.takeLast(1000)' in secure
 assert 'nativeCancel' in model and 'nativeResetCancel' in model
@@ -43,8 +43,8 @@ assert 'stop_requested.store(true' in read('app/src/main/cpp/bridge.cpp')
 assert 'roles.erase(roles.begin() + 1, roles.begin() + 1 + discard)' in read('app/src/main/cpp/bridge.cpp')
 assert 'llama_sampler_accept' in read('app/src/main/cpp/bridge.cpp')
 assert 'model_previous.bak' in secure
-assert 'versionCode = 9' in read('app/build.gradle.kts')
-assert 'EclipseCompanion-v0.4.5-privacy-model-test-apk' in read('.github/workflows/android-debug.yml')
+assert 'versionCode = 10' in read('app/build.gradle.kts')
+assert 'EclipseCompanion-v0.4.6-guided-gguf-setup-apk' in read('.github/workflows/android-debug.yml')
 assert 'replyGate.mayCommit(ticket)' in activity
 assert 'replyGate.cancel()' in activity
 assert 'override fun onStop()' in activity
@@ -74,8 +74,8 @@ assert 'setSingleChoiceItems(' in activity
 assert 'Screen capture: ALLOWED' in activity and 'Screen capture: BLOCKED' in activity
 assert '"screenshotsAllowed"' not in secure, 'Screenshot permission must never persist'
 assert 'android:name="dev.privatecompanion.eclipse.MainActivity"' in manifest
-assert 'applicationIdSuffix = ".preview45"' in read('app/build.gradle.kts')
-assert 'Eclipse Privacy Test 0.4.5' in read('app/build.gradle.kts')
+assert 'applicationIdSuffix = ".preview46"' in read('app/build.gradle.kts')
+assert 'Eclipse Model Test 0.4.6' in read('app/build.gradle.kts')
 assert 'WindowInsets.Type.ime()' in activity
 assert 'MobileWindowPadding.resolve(' in activity
 assert 'MobileWindowPaddingTest.kt' in '\n'.join(p.name for p in (root / 'app/src/test/java/dev/privatecompanion/eclipse').glob('*'))
@@ -98,4 +98,17 @@ assert 'ComposerPolicy.evaluate(' in activity
 assert 'actionState.showRetry' in activity and 'actionState.showStop' in activity
 assert 'composerDock.addView(actions)' in activity
 assert 'ComposerPolicyTest.kt' in '\n'.join(p.name for p in (root / 'app/src/test/java/dev/privatecompanion/eclipse').glob('*'))
-print('PASS: 92 static source/privacy/build checks (NOT runtime security validation)')
+model_guide = read('app/src/main/java/dev/privatecompanion/eclipse/ModelSetupGuide.kt')
+assert 'QWEN_DOWNLOAD_URL' in model_guide
+assert 'Qwen2.5-1.5B-Instruct-GGUF/resolve/main/' in model_guide
+assert 'qwen2.5-1.5b-instruct-q4_k_m.gguf' in model_guide
+assert 'Intent(Intent.ACTION_VIEW, Uri.parse(ModelSetupGuide.QWEN_DOWNLOAD_URL))' in activity
+assert 'Open official Qwen GGUF download' in activity
+assert 'Step 1 · Get a GGUF model' in activity
+assert 'Step 2 · Import from phone storage' in activity
+assert 'Step 3 · Load into device memory' in activity
+assert 'installedModelDescription()' in activity
+assert 'ModelSetupGuide.checkImport(size, filesDir.usableSpace)' in activity
+assert 'freeBytes() >= reserveFreeBytes' in read('app/src/main/java/dev/privatecompanion/eclipse/ModelFiles.kt')
+assert 'ModelSetupGuideTest.kt' in '\n'.join(p.name for p in (root / 'app/src/test/java/dev/privatecompanion/eclipse').glob('*'))
+print('PASS: guided GGUF setup + existing offline, privacy and build source assertions')
