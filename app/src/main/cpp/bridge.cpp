@@ -101,13 +101,25 @@ Java_dev_privatecompanion_eclipse_LocalModel_nativeLoad(JNIEnv* env, jobject, js
 extern "C" JNIEXPORT jstring JNICALL
 Java_dev_privatecompanion_eclipse_LocalModel_nativeReply(JNIEnv* env, jobject, jobjectArray jroles,
                                                            jobjectArray jcontents, jint maxTokens,
-                                                           jfloat temperature) {
+                                                           jfloat temperature, jobject listener) {
     std::lock_guard<std::mutex> guard(gate);
     if (!ctx || !model) return from_utf8(env, "ECLIPSE_ERROR: Model is not loaded");
     if (!jroles || !jcontents) return from_utf8(env, "ECLIPSE_ERROR: Chat messages unavailable");
     jsize n = env->GetArrayLength(jroles);
     if (n != env->GetArrayLength(jcontents) || n < 2 || n > 45)
         return from_utf8(env, "ECLIPSE_ERROR: Invalid chat history");
+    // Optional UI preview: emit partial text without saving it to persistent storage.
+    jmethodID onPartial = nullptr;
+    if (listener) {
+        jclass clazz = env->GetObjectClass(listener);
+        if (!clazz) return from_utf8(env, "ECLIPSE_ERROR: Unable to open progress callback");
+        onPartial = env->GetMethodID(clazz, "onPartial", "(Ljava/lang/String;)V");
+        env->DeleteLocalRef(clazz);
+        if (!onPartial || env->ExceptionCheck()) {
+            if (env->ExceptionCheck()) env->ExceptionClear();
+            return from_utf8(env, "ECLIPSE_ERROR: Progress callback unavailable");
+        }
+    }
     std::vector<std::string> roles, contents;
     roles.reserve(n); contents.reserve(n);
     for (jsize i = 0; i < n; ++i) {
@@ -175,6 +187,16 @@ Java_dev_privatecompanion_eclipse_LocalModel_nativeReply(JNIEnv* env, jobject, j
             int count = llama_token_to_piece(vocab, token, piece, sizeof(piece), 0, true);
             if (count < 0) { ok = false; break; }
             answer.append(piece, count);
+            // First token feedback, then updates every 8 tokens to avoid UI flood.
+            if (listener && onPartial && (i == 0 || (i % 8) == 7)) {
+                jstring partial = from_utf8(env, answer);
+                if (partial) {
+                    env->CallVoidMethod(listener, onPartial, partial);
+                    env->DeleteLocalRef(partial);
+                    // An Activity teardown must not interrupt the model engine.
+                    if (env->ExceptionCheck()) env->ExceptionClear();
+                }
+            }
             if (i == predict - 1) break;
             if (!prepare(batch, &token, 1, pos) ||
                 llama_process(ctx, LLAMA_PROCESS_TYPE_DECODE, batch) != 0) { ok = false; break; }

@@ -13,12 +13,13 @@ import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
-data class PortableSnapshot(val profile: CompanionProfile, val messages: List<ChatEntry>)
+data class PortableSnapshot(val profile: CompanionProfile, val messages: List<ChatEntry>, val replyLength: ReplyLength = ReplyLength.QUICK)
 
 class PrivateStore(private val context: Context) {
     private val file = AtomicFile(File(context.filesDir, "private_state.enc"))
     private val alias = "eclipse_companion_aes_v1"
     var profile = CompanionProfile()
+    var replyLength = ReplyLength.QUICK
     val messages = mutableListOf<ChatEntry>()
     var ageConfirmed = false
         private set
@@ -58,6 +59,7 @@ class PrivateStore(private val context: Context) {
         cipher.init(Cipher.DECRYPT_MODE, key(), GCMParameterSpec(128, ciphertext.copyOfRange(1, 13)))
         val decoded = JSONObject(String(cipher.doFinal(ciphertext, 13, ciphertext.size - 13), Charsets.UTF_8))
         ageConfirmed = decoded.optBoolean("ageConfirmed", false)
+        replyLength = ReplyLength.fromStored(decoded.optString("replyLength", "QUICK"))
         val person = decoded.optJSONObject("profile") ?: JSONObject()
         val trait = person.optJSONObject("traits") ?: JSONObject()
         val appearance = person.optJSONObject("appearance") ?: JSONObject()
@@ -118,6 +120,7 @@ class PrivateStore(private val context: Context) {
         val root = JSONObject().apply {
             put("schema", 2)
             put("ageConfirmed", ageConfirmed)
+            put("replyLength", replyLength.name)
             put("profile", person)
             put("messages", JSONArray().apply {
                 messages.takeLast(1000).filter { CompanionLogic.requireValidRole(it.role) }.forEach { m ->
@@ -190,21 +193,25 @@ class PrivateStore(private val context: Context) {
             require(timestamp >= 0L) { "Invalid chat timestamp" }
             messages.add(ChatEntry(role, content, timestamp))
         }
-        return PortableSnapshot(profile, messages)
+        return PortableSnapshot(profile, messages,
+            ReplyLength.fromStored(root.optString("replyLength", "QUICK")))
     }
 
     /** Strong transaction boundary: if Android Keystore or disk fails, restore in-memory state. */
     fun restorePortable(snapshot: PortableSnapshot) {
         require(ageConfirmed) { "Age confirmation required before importing a backup" }
         val oldProfile = profile
+        val oldReplyLength = replyLength
         val oldMessages = messages.toList()
         try {
             profile = snapshot.profile
+            replyLength = snapshot.replyLength
             messages.clear()
             messages.addAll(snapshot.messages)
             save()
         } catch (e: Exception) {
             profile = oldProfile
+            replyLength = oldReplyLength
             messages.clear()
             messages.addAll(oldMessages)
             throw e
@@ -229,6 +236,7 @@ class PrivateStore(private val context: Context) {
     fun wipeEverything() {
         messages.clear()
         profile = CompanionProfile()
+        replyLength = ReplyLength.QUICK
         ageConfirmed = false
         file.delete()
         File(context.filesDir, "portrait.png").delete()

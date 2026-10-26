@@ -1,11 +1,13 @@
 package dev.privatecompanion.eclipse
 
 /** JNI backing is llama.cpp compiled into the APK, no HTTP endpoints. */
+fun interface ReplyProgress { fun onPartial(text: String) }
+
 object LocalModel {
     @Volatile private var loadedLibrary = false
     @Volatile private var loadedModel = false
     private external fun nativeLoad(path: String, threads: Int, contextSize: Int): Boolean
-    private external fun nativeReply(roles: Array<String>, contents: Array<String>, maxTokens: Int, temperature: Float): String
+    private external fun nativeReply(roles: Array<String>, contents: Array<String>, maxTokens: Int, temperature: Float, listener: ReplyProgress?): String
     private external fun nativeUnload()
     private external fun nativeCancel()
     private external fun nativeResetCancel()
@@ -27,13 +29,16 @@ object LocalModel {
 
     fun ready(): Boolean = loadedModel
 
-    @Synchronized fun respond(profile: CompanionProfile, history: List<ChatEntry>): String {
+    @Synchronized fun respond(
+        profile: CompanionProfile, history: List<ChatEntry>,
+        length: ReplyLength = ReplyLength.QUICK, progress: ReplyProgress? = null
+    ): String {
         if (!loadedModel) throw IllegalStateException("Import a local GGUF model first")
-        val recent = CompanionLogic.contextWindow(history)
+        val recent = CompanionLogic.contextWindow(history, length.historyTurns)
         val roles = arrayOf("system") + recent.map { it.role }
         val contents = arrayOf(CompanionLogic.systemPrompt(profile)) + recent.map { it.content }
         if (cancelRequested) { cancelRequested = false; throw IllegalStateException("Generation cancelled") }
-        val answer = try { nativeReply(roles, contents, 240, 0.8f) } finally { cancelRequested = false }
+        val answer = try { nativeReply(roles, contents, length.maxTokens, 0.8f, progress) } finally { cancelRequested = false }
         if (answer.startsWith("ECLIPSE_ERROR:")) {
             throw IllegalStateException(answer.removePrefix("ECLIPSE_ERROR:").trim())
         }

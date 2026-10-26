@@ -43,6 +43,8 @@ class MainActivity : Activity() {
     private lateinit var chatScroll: ScrollView
     private lateinit var composerDock: LinearLayout
     private var composerEdit: EditText? = null
+    private var streamingPreview = ""
+    private var previewLabel: TextView? = null
     private val navigationButtons = linkedMapOf<String, Button>()
     private var lastAppliedPadding = EdgePadding(0, 0, 0, 0)
     private var sending = false
@@ -54,11 +56,13 @@ class MainActivity : Activity() {
     private var modelBusy = false
     private var pane = "Chat"
     private var status = "Import a GGUF model to begin private AI conversations."
-    private val violet = Color.rgb(170, 133, 238)
-    private val light = Color.rgb(239, 231, 252)
-    private val muted = Color.rgb(181, 170, 201)
-    private val dark = Color.rgb(29, 25, 45)
-    private val panel = Color.rgb(45, 38, 67)
+    private val violet = Color.rgb(181, 156, 246)
+    private val cyan = Color.rgb(108, 220, 215)
+    private val light = Color.rgb(236, 243, 255)
+    private val muted = Color.rgb(151, 170, 195)
+    private val dark = Color.rgb(12, 17, 30)
+    private val panel = Color.rgb(24, 33, 54)
+    private val borderColor = Color.rgb(50, 65, 90)
     private val requestModel = 201
     private val requestImage = 202
     private val requestBackupCreate = 203
@@ -215,20 +219,31 @@ class MainActivity : Activity() {
 
     private fun pad(v: View, x: Int = 18, y: Int = 12) = v.setPadding(dp(x), dp(y), dp(x), dp(y))
 
+    private fun outlined(color: Int = panel, radius: Int = 14, stroke: Int = borderColor): GradientDrawable =
+        GradientDrawable().apply {
+            setColor(color)
+            cornerRadius = dp(radius).toFloat()
+            setStroke(dp(1), stroke)
+        }
+
     private fun label(text: String, size: Float = 16f, color: Int = light, bold: Boolean = false): TextView =
         TextView(this).apply {
             this.text = text
             textSize = size
             setTextColor(color)
-            if (bold) setTypeface(null, Typeface.BOLD)
-            setPadding(dp(4), dp(8), dp(4), dp(8))
+            typeface = Typeface.create(
+                if (bold) "sans-serif-medium" else "sans-serif",
+                if (bold) Typeface.BOLD else Typeface.NORMAL
+            )
+            setPadding(dp(2), dp(4), dp(2), dp(4))
         }
 
     private fun input(text: String = "", hint: String = "", lines: Int = 1): EditText = EditText(this).apply {
         setText(text); this.hint = hint
         setTextColor(light); setHintTextColor(muted)
         textSize = 15f
-        background = bg(panel, 18f)
+        typeface = Typeface.create("sans-serif", Typeface.NORMAL)
+        background = outlined(panel, 14)
         pad(this)
         if (lines > 1) { inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE; minLines = lines }
         else inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
@@ -236,8 +251,9 @@ class MainActivity : Activity() {
 
     private fun button(title: String, onClick: () -> Unit): Button = Button(this).apply {
         text = title
-        textSize = 14f
+        textSize = 13f
         isAllCaps = false
+        typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
         maxLines = 2
         gravity = Gravity.CENTER
         minimumWidth = 0
@@ -246,7 +262,7 @@ class MainActivity : Activity() {
         setTextColor(Color.WHITE)
         // Avoid OEM themes tinting the button into an opaque white rectangle.
         backgroundTintList = null
-        background = bg(Color.rgb(100, 68, 151), dp(12).toFloat())
+        background = outlined(Color.rgb(75, 62, 131), 13, Color.rgb(106, 93, 165))
         stateListAnimator = null
         setOnClickListener { onClick() }
     }
@@ -261,44 +277,62 @@ class MainActivity : Activity() {
         applySafeInsets(root)
         setContentView(root)
         root.requestApplyInsets()
-        val titleBar = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; pad(this, 16, 6) }
-        titleBar.addView(label("ECLIPSE  ·  PRIVATE COMPANION", 17f, light, true))
-        titleBar.addView(label("Offline only  •  On-device conversations", 12f, muted))
+        val titleBar = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(20), dp(13), dp(20), dp(7))
+        }
+        val brand = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        brand.addView(label("E C L I P S E", 17f, light, true))
+        brand.addView(label("PRIVATE COMPANION", 10f, muted))
+        titleBar.addView(brand, LinearLayout.LayoutParams(0, -2, 1f))
+        titleBar.addView(label("●  OFFLINE", 10f, cyan, true).apply {
+            setPadding(dp(10), dp(7), dp(10), dp(7))
+            background = outlined(Color.rgb(17, 46, 55), 30, Color.rgb(37, 105, 111))
+        })
         root.addView(titleBar)
-        // Recreate the navigation binding for each Activity, including after rotation.
+
         navigationButtons.clear()
-        // Two-column tabs remain legible on narrow screens and with larger fonts.
-        val tabs = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; pad(this, 8, 2) }
-        listOf(listOf("Chat", "Personality"), listOf("Appearance", "Privacy")).forEach { names ->
-            val tabRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-            names.forEach { name ->
-                val tab = button(name) { navigateTo(name) }
-                navigationButtons[name] = tab
-                if (pane == name) tab.background = bg(Color.rgb(125, 86, 184), dp(12).toFloat())
-                tabRow.addView(tab, LinearLayout.LayoutParams(0, dp(52), 1f).apply {
-                    setMargins(dp(3), dp(2), dp(3), dp(2))
-                })
+        val tabs = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(dp(12), dp(7), dp(12), dp(9))
+        }
+        listOf("Chat", "Personality", "Appearance", "Privacy").forEach { name ->
+            val tab = button(name) { navigateTo(name) }.apply {
+                textSize = 12f
+                maxLines = 1
+                isSingleLine = true
+                background = if (pane == name) outlined(Color.rgb(55, 51, 101), 12, violet)
+                    else outlined(panel, 12)
+                setTextColor(if (pane == name) light else muted)
             }
-            tabs.addView(tabRow)
+            navigationButtons[name] = tab
+            tabs.addView(tab, LinearLayout.LayoutParams(0, dp(ChatLayout.NAV_HEIGHT_DP), 1f).apply {
+                setMargins(dp(ChatLayout.NAV_GAP_DP / 2), 0, dp(ChatLayout.NAV_GAP_DP / 2), 0)
+            })
         }
         root.addView(tabs)
-        val scroll = ScrollView(this).apply { isFillViewport = true }
+
+        val scroll = ScrollView(this).apply {
+            isFillViewport = true
+            isVerticalScrollBarEnabled = false
+        }
         chatScroll = scroll
         content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(16), dp(8), dp(16), dp(28))
+            setPadding(dp(18), dp(12), dp(18), dp(22))
         }
         scroll.addView(content)
-        root.addView(scroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
-        // Composer stays visible above keyboard, separate from scrollable chat history.
+        root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
+        // Dock is outside message scroll, and uses IME insets to stay above the keyboard.
         composerDock = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(dark)
-            setPadding(dp(12), dp(4), dp(12), dp(8))
+            background = outlined(Color.rgb(16, 24, 40), 18)
+            setPadding(dp(12), dp(12), dp(12), dp(12))
         }
-        root.addView(composerDock, LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
-        ))
+        root.addView(composerDock, LinearLayout.LayoutParams(-1, -2).apply {
+            setMargins(dp(12), dp(2), dp(12), dp(8))
+        })
         render()
     }
 
@@ -314,10 +348,9 @@ class MainActivity : Activity() {
         }
         pane = name
         for ((tabName, button) in navigationButtons) {
-            button.background = bg(
-                if (tabName == pane) Color.rgb(125, 86, 184) else Color.rgb(100, 68, 151),
-                dp(12).toFloat()
-            )
+            button.background = if (tabName == pane) outlined(Color.rgb(55, 51, 101), 12, violet)
+                else outlined(panel, 12)
+            button.setTextColor(if (tabName == pane) light else muted)
         }
         render()
         if (name != "Chat") {
@@ -329,6 +362,7 @@ class MainActivity : Activity() {
         content.removeAllViews()
         composerDock.removeAllViews()
         composerEdit = null
+        previewLabel = null
         when (pane) {
             "Chat" -> {
                 chatPane()
@@ -344,8 +378,40 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun chatBubble(title: String, message: String, owner: Boolean): TextView {
+        val color = if (owner) Color.rgb(36, 43, 75) else panel
+        val body = label(message, 15f, light).apply {
+            setPadding(dp(12), dp(5), dp(12), dp(12))
+            setTextIsSelectable(true)
+        }
+        val bubble = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = outlined(color, 15, if (owner) Color.rgb(78, 85, 139) else borderColor)
+            addView(label(title, 10f, if (owner) violet else cyan, true).apply {
+                setPadding(dp(12), dp(10), dp(12), dp(2))
+            })
+            addView(body)
+        }
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = if (owner) Gravity.END else Gravity.START
+            addView(bubble, LinearLayout.LayoutParams(
+                ChatLayout.bubbleWidth(resources.displayMetrics.widthPixels - dp(42)), -2
+            ))
+        }
+        content.addView(row, LinearLayout.LayoutParams(-1, -2).apply {
+            bottomMargin = dp(ChatLayout.MESSAGE_GAP_DP)
+        })
+        return body
+    }
+
     private fun chatPane() {
-        val header = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(10), dp(10), dp(10), dp(10))
+            background = outlined(Color.rgb(19, 27, 45), 18)
+        }
         val image = ImageView(this).apply {
             scaleType = ImageView.ScaleType.CENTER_CROP
             val path = File(filesDir, "portrait.png")
@@ -358,52 +424,62 @@ class MainActivity : Activity() {
             }.getOrNull()
             if (portrait != null) setImageBitmap(portrait)
             else setImageResource(android.R.drawable.ic_menu_gallery)
-            background = bg(panel, 20f)
+            background = outlined(panel, 14)
             clipToOutline = true
         }
-        header.addView(image, LinearLayout.LayoutParams(dp(84), dp(84)).apply { rightMargin = dp(12) })
+        header.addView(image, LinearLayout.LayoutParams(dp(64), dp(64)).apply { rightMargin = dp(12) })
         header.addView(LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            addView(label(store.profile.name, 23f, light, true))
-            addView(label(store.profile.preset + " · " + if (store.profile.adultMode) "Adult mode" else "Everyday mode", 14f, muted))
-            addView(label(if (LocalModel.ready()) "Local model ready" else "Model not loaded", 13f, violet))
-        })
+            addView(label(store.profile.name, 21f, light, true))
+            addView(label(store.profile.preset + " · " +
+                if (store.profile.adultMode) "Adult mode" else "Everyday mode", 12f, muted))
+            addView(label(if (LocalModel.ready()) "●  LOCAL AI READY" else "○  MODEL NOT LOADED",
+                11f, if (LocalModel.ready()) cyan else muted, true))
+        }, LinearLayout.LayoutParams(0, -2, 1f))
         content.addView(header)
-        space()
-        if (status.startsWith("Local reply failed") || status.startsWith("Generation") || sending) {
-            content.addView(label(status, 13f, muted))
-            space(4)
+        space(16)
+
+        if (sending || status.startsWith("Local reply failed") ||
+            status.startsWith("Generation") || status.startsWith("Reply ready")) {
+            content.addView(label(status, 12f, if (sending) cyan else muted))
+            space(10)
         }
         if (!LocalModel.ready()) {
             content.addView(label(
-                "A compatible local GGUF model must be imported and loaded before chat replies work. " +
-                    "Companion settings and appearance can be edited without a model.",
-                15f, muted
+                "Import a compatible GGUF model to enable private on-device replies. " +
+                    "You can customize your companion without a model.", 14f, muted
             ))
-            content.addView(button("Set up local GGUF model") { navigateTo("Privacy") })
             space(8)
+            content.addView(button("Set up local GGUF model") { navigateTo("Privacy") })
+            space(12)
         } else if (store.messages.isEmpty()) {
             content.addView(label(
-                "Your conversation starts here. Use Ideas beside Send for an editable first message.",
-                15f, muted
+                "Start a conversation, or tap Ideas to find something to talk about.", 14f, muted
             ))
+            space(12)
         }
         for (m in store.messages.takeLast(50)) {
-            val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; pad(this, 13, 10) }
-            box.background = bg(if (m.role == "user") Color.rgb(65, 52, 89) else panel)
-            box.addView(label(if (m.role == "user") "YOU" else store.profile.name.uppercase(), 12f, violet, true))
-            box.addView(label(m.content, 15f))
-            content.addView(box, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 9 })
+            chatBubble(if (m.role == "user") "YOU" else store.profile.name.uppercase(),
+                m.content, m.role == "user")
         }
-        if (store.messages.size > 50) content.addView(label("Showing the most recent 50 messages. Older messages remain saved locally.", 12f, muted))
-
+        if (sending) {
+            previewLabel = chatBubble(
+                "${store.profile.name.uppercase()} · COMPOSING",
+                streamingPreview.ifBlank { "Preparing a reply on your device…" },
+                false
+            )
+        }
+        if (store.messages.size > 50) {
+            content.addView(label("Showing the latest 50 messages. Older messages remain encrypted.", 12f, muted))
+        }
     }
 
-    /** Fixed chat input, not inside the message ScrollView. Remains reachable with the keyboard. */
+    /** Single compact dock: Send changes to Stop, so buttons never collide or stack. */
     private fun composerPane() {
-        val edit = input(draftText, "Type a message to ${store.profile.name}...", 2).apply {
-            maxLines = 4
+        val edit = input(draftText, "Message ${store.profile.name}…", 2).apply {
+            maxLines = 3
             minLines = 2
+            setPadding(dp(14), dp(12), dp(14), dp(12))
         }
         composerEdit = edit
         edit.addTextChangedListener(object : TextWatcher {
@@ -416,11 +492,26 @@ class MainActivity : Activity() {
         composerDock.addView(edit, LinearLayout.LayoutParams(-1, -2))
         val actions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         val actionState = ComposerPolicy.evaluate(sending, modelBusy, store.messages.lastOrNull()?.role)
-        val send = button(if (sending) "Thinking..." else "Send message") {
-            if (sending || modelBusy) return@button
+        val retry = actionState.showRetry && draftText.isBlank()
+        val send = button(
+            if (actionState.showStop) "■  Stop response"
+            else if (retry) "↻  Retry reply"
+            else "Send"
+        ) {
+            if (sending) {
+                replyGate.cancel()
+                LocalModel.cancel()
+                status = "Stopping local generation..."
+                if (pane == "Chat") render()
+                return@button
+            }
+            if (modelBusy) return@button
             if (!LocalModel.ready()) { toast("Load a GGUF model in Privacy first."); return@button }
             val userText = edit.text.toString().trim().take(3000)
-            if (userText.isBlank()) return@button
+            if (userText.isBlank()) {
+                if (actionState.showRetry) startReply()
+                return@button
+            }
             store.messages.add(ChatEntry("user", userText, System.currentTimeMillis()))
             try { store.save() } catch (e: Exception) {
                 store.messages.removeAt(store.messages.lastIndex)
@@ -431,25 +522,19 @@ class MainActivity : Activity() {
             conversationRevision++
             startReply()
         }
-        send.isEnabled = actionState.sendEnabled
-        actions.addView(send, LinearLayout.LayoutParams(0, dp(52), 2f).apply {
-            rightMargin = dp(6)
+        send.isEnabled = actionState.sendEnabled || actionState.showStop
+        if (actionState.showStop) send.contentDescription = "Stop current response"
+        if (actionState.showRetry) send.contentDescription = "Generate/retry reply to last message"
+        actions.addView(send, LinearLayout.LayoutParams(0, dp(ChatLayout.COMPOSER_BUTTON_HEIGHT_DP), 2f))
+        actions.addView(button("Ideas") { showStarterDialog() }.apply {
+            background = outlined(panel, 13, borderColor)
+            setTextColor(light)
+        }, LinearLayout.LayoutParams(0, dp(ChatLayout.COMPOSER_BUTTON_HEIGHT_DP), 1f).apply {
+            leftMargin = dp(ChatLayout.COMPOSER_GAP_DP)
         })
-        actions.addView(button("Ideas") { showStarterDialog() },
-            LinearLayout.LayoutParams(0, dp(52), 1f))
-        composerDock.addView(actions)
-        if (actionState.showRetry) {
-            composerDock.addView(button("Generate/retry reply to last message") { startReply() },
-                LinearLayout.LayoutParams(-1, dp(48)))
-        }
-        if (actionState.showStop) {
-            composerDock.addView(button("Stop current response") {
-                replyGate.cancel()
-                LocalModel.cancel()
-                status = "Stopping local generation..."
-                if (pane == "Chat") render()
-            }, LinearLayout.LayoutParams(-1, dp(48)))
-        }
+        composerDock.addView(actions, LinearLayout.LayoutParams(-1, -2).apply {
+            topMargin = dp(ChatLayout.COMPOSER_GAP_DP)
+        })
     }
 
     private fun showStarterDialog() {
@@ -474,18 +559,37 @@ class MainActivity : Activity() {
         val ticket = replyGate.begin()
         val profileSnapshot = store.profile
         val historySnapshot = store.messages.toList()
+        val lengthSnapshot = store.replyLength
+        val startedAt = android.os.SystemClock.elapsedRealtime()
+        streamingPreview = ""
         LocalModel.beginRequest() // resets previous stop before the executor starts
         sending = true
-        status = "Generating locally; press Stop to cancel."
+        status = "Generating locally · ${lengthSnapshot.title} · tap Stop to cancel."
         if (pane == "Chat") render()
         worker.execute {
-            val result = runCatching { LocalModel.respond(profileSnapshot, historySnapshot) }
+            val progress = ReplyProgress { partial ->
+                runOnUiThread {
+                    if (!isFinishing && !isDestroyed && sending &&
+                        replyGate.mayCommit(ticket) && revision == conversationRevision) {
+                        streamingPreview = partial.take(3000)
+                        if (pane == "Chat") {
+                            previewLabel?.text = streamingPreview
+                            chatScroll.post { if (pane == "Chat" && sending)
+                                chatScroll.fullScroll(View.FOCUS_DOWN) }
+                        }
+                    }
+                }
+            }
+            val result = runCatching {
+                LocalModel.respond(profileSnapshot, historySnapshot, lengthSnapshot, progress)
+            }
             runOnUiThread {
                 if (isFinishing || isDestroyed) return@runOnUiThread
                 if (!replyGate.mayCommit(ticket) || revision != conversationRevision || store.messages.lastOrNull() != last) {
                     replyGate.finish(ticket)
                     if (revision == conversationRevision) status = "Generation stopped. Retry your last message when ready."
                     sending = false // History was cleared/replaced while inference was running
+                    streamingPreview = ""
                     if (pane == "Chat") render()
                     return@runOnUiThread
                 }
@@ -495,7 +599,8 @@ class MainActivity : Activity() {
                     try {
                         store.save()
                         conversationRevision++
-                        status = "Local reply generated."
+                        val seconds = (android.os.SystemClock.elapsedRealtime() - startedAt) / 1000.0
+                        status = "Reply ready in ${"%.1f".format(java.util.Locale.US, seconds)} s · ${lengthSnapshot.title}"
                     } catch (e: Exception) {
                         store.messages.removeAt(store.messages.lastIndex)
                         status = "Local reply failed to save: ${e.message}"
@@ -506,6 +611,7 @@ class MainActivity : Activity() {
                     toast("Local reply stopped or failed. Retry is available.")
                 }
                 sending = false
+                streamingPreview = ""
                 if (pane == "Chat") render()
             }
         }
@@ -753,6 +859,32 @@ class MainActivity : Activity() {
             }
         })
         space(18)
+        section("Response speed")
+        content.addView(label(
+            "Quick (default) generates fewer tokens with less recent history. " +
+                "Detailed replies can take significantly longer on a phone CPU. " +
+                "Replies begin appearing as soon as the local engine starts generating.",
+            13f, muted
+        ))
+        space(8)
+        content.addView(button("Reply length: ${store.replyLength.title}  ·  Tap to change") {
+            val choices = ReplyLength.entries.toTypedArray()
+            AlertDialog.Builder(this)
+                .setTitle("Choose offline reply length")
+                .setSingleChoiceItems(choices.map { it.title }.toTypedArray(),
+                    choices.indexOf(store.replyLength)) { dialog, index ->
+                    dialog.dismiss()
+                    val previous = store.replyLength
+                    store.replyLength = choices[index]
+                    try { store.save() } catch (e: Exception) {
+                        store.replyLength = previous
+                        toast("Could not save reply preference: ${e.message}")
+                    }
+                    render()
+                }
+                .setNegativeButton("Cancel", null).show()
+        })
+        space(16)
         section("Conversation preferences")
         content.addView(label("Adult mode is optional and off by default. It only applies to consensual adult character conversations; actual output depends on your chosen local model.", 14f, muted))
         content.addView(button(if (store.profile.adultMode) "Adult mode: ON (tap to disable)" else "Adult mode: OFF (tap to enable)") {
