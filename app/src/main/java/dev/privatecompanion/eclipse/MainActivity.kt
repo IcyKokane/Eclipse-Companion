@@ -61,6 +61,10 @@ class MainActivity : Activity() {
     private val panel = Color.rgb(45, 38, 67)
     private val requestModel = 201
     private val requestImage = 202
+    private val requestBackupCreate = 203
+    private val requestBackupOpen = 204
+    private var pendingEncryptedExport: ByteArray? = null
+    private var backupBusy = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -762,6 +766,27 @@ class MainActivity : Activity() {
                 }.show()
         })
         space(18)
+        section("Portable encrypted backup")
+        content.addView(label(
+            "Export your companion personality, memories and up to 1,000 chat messages " +
+                "as an encrypted password-protected .eclipsebackup file. " +
+                "The file can be restored in another Eclipse version that supports portable backups. " +
+                "Portraits, reference images and GGUF model files are NOT included. " +
+                "Older Eclipse versions cannot export in this format.",
+            13f, muted
+        ))
+        space(8)
+        content.addView(button("Export encrypted chats & settings") { beginBackupExport() })
+        space(8)
+        content.addView(button("Import encrypted chats & settings") { chooseBackupImport() })
+        space(8)
+        content.addView(label(
+            "Choose a unique password with at least 12 characters. It cannot be recovered. " +
+                "Import replaces this installation's companion settings and chats only, " +
+                "after showing a separate confirmation. Keep your backup file private.",
+            12f, muted
+        ))
+        space(18)
         section("Your data")
         content.addView(label("Chat history and settings are encrypted with a key in Android Keystore. Images and imported model files are private app files. Uninstalling or clearing app data deletes access to them; flash-memory secure erasure is not guaranteed.", 13f, muted))
         space()
@@ -796,6 +821,192 @@ class MainActivity : Activity() {
         })
     }
 
+    private fun passwordInput(hint: String): EditText = EditText(this).apply {
+        this.hint = hint
+        inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+        setSingleLine(true)
+        setTextColor(light)
+        setHintTextColor(muted)
+        textSize = 16f
+        background = bg(panel, dp(10).toFloat())
+        setPadding(dp(12), dp(10), dp(12), dp(10))
+    }
+
+    private fun beginBackupExport() {
+        if (backupBusy || modelBusy || sending) {
+            toast("Finish the current operation before exporting a backup")
+            return
+        }
+        val first = passwordInput("Backup password (12+ characters)")
+        val second = passwordInput("Confirm backup password")
+        val layout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(8), dp(16), dp(8))
+            addView(first)
+            addView(second)
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Create encrypted backup")
+            .setMessage("The password is required for recovery. A forgotten password cannot be reset. " +
+                "Only character settings and chats are included, not model files or images.")
+            .setView(layout)
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Encrypt") { _, _ ->
+                val pass = first.text.toString().toCharArray()
+                val confirm = second.text.toString().toCharArray()
+                try {
+                    if (pass.size !in 12..256 || !pass.contentEquals(confirm)) {
+                        toast("Use a matching password of 12–256 characters")
+                    } else {
+                        backupBusy = true
+                        val plain = store.exportPlaintextSnapshot()
+                        worker.execute {
+                            try {
+                                val encrypted = PortableBackup.encrypt(plain, pass)
+                                runOnUiThread {
+                                    if (isFinishing || isDestroyed) return@runOnUiThread
+                                    pendingEncryptedExport = encrypted
+                                    val picker = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+                                        addCategory(Intent.CATEGORY_OPENABLE)
+                                        type = "application/octet-stream"
+                                        putExtra(Intent.EXTRA_TITLE,
+                                            "Eclipse-Companion-${System.currentTimeMillis()}.eclipsebackup")
+                                    }
+                                    try {
+                                        startActivityForResult(picker, requestBackupCreate)
+                                    } catch (e: Exception) {
+                                        pendingEncryptedExport = null
+                                        backupBusy = false
+                                        toast("Cannot open document picker: ${e.message}")
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                runOnUiThread {
+                                    backupBusy = false
+                                    toast("Backup encryption failed: ${e.message}")
+                                }
+                            } finally {
+                                plain.fill(0)
+                                pass.fill(0.toChar())
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    backupBusy = false
+                    toast("Cannot prepare backup: ${e.message}")
+                } finally {
+                    confirm.fill(0.toChar())
+                }
+            }.show()
+    }
+
+    private fun finishBackupExport(uri: Uri) {
+        val encrypted = pendingEncryptedExport
+        pendingEncryptedExport = null
+        if (encrypted == null) {
+            backupBusy = false
+            toast("Backup preparation was interrupted; retry export")
+            return
+        }
+        worker.execute {
+            try {
+                val stream = contentResolver.openOutputStream(uri, "w")
+                    ?: error("Selected document cannot be written")
+                stream.use { out ->
+                    out.write(encrypted)
+                    out.flush()
+                }
+                runOnUiThread {
+                    backupBusy = false
+                    toast("Encrypted backup written. Keep its password and file safely.")
+                }
+            } catch (e: Exception) {
+                runOnUiThread {
+                    backupBusy = false
+                    toast("Backup write failed; delete any incomplete file: ${e.message}")
+                }
+            } finally {
+                encrypted.fill(0)
+            }
+        }
+    }
+
+    private fun chooseBackupImport() {
+        if (backupBusy || sending || modelBusy) {
+            toast("Finish the current operation before importing a backup")
+            return
+        }
+        backupBusy = true
+        val picker = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "*/*"
+        }
+        try {
+            startActivityForResult(picker, requestBackupOpen)
+        } catch (e: Exception) {
+            backupBusy = false
+            toast("Cannot open backup picker: ${e.message}")
+        }
+    }
+
+    private fun beginBackupImport(uri: Uri) {
+        val passwordField = passwordInput("Backup password")
+        AlertDialog.Builder(this).setTitle("Unlock encrypted backup")
+            .setMessage("Choose the .eclipsebackup file's password. No changes will be made " +
+                "until the backup has passed validation and you confirm replacement.")
+            .setView(passwordField)
+            .setNegativeButton("Cancel") { _, _ -> backupBusy = false }
+            .setOnCancelListener { backupBusy = false }
+            .setPositiveButton("Unlock") { _, _ ->
+                val pass = passwordField.text.toString().toCharArray()
+                worker.execute {
+                    try {
+                        val input = contentResolver.openInputStream(uri)
+                            ?: error("Selected backup cannot be read")
+                        val bytes = PortableBackup.readBounded(input)
+                        val snapshot = try { store.decodePortable(bytes, pass) }
+                            finally { bytes.fill(0) }
+                        runOnUiThread {
+                            if (isFinishing || isDestroyed) return@runOnUiThread
+                            AlertDialog.Builder(this)
+                                .setTitle("Replace chats and character settings?")
+                                .setMessage(
+                                    "This backup contains '${snapshot.profile.name}' and " +
+                                        "${snapshot.messages.size} chat messages. " +
+                                        "Restoring REPLACES the current chat history and companion " +
+                                        "settings. Your existing imported GGUF and image files stay unchanged. " +
+                                        "Make a backup of the current chats first if needed."
+                                )
+                                .setNegativeButton("Keep current data") { _, _ -> backupBusy = false }
+                                .setOnCancelListener { backupBusy = false }
+                                .setPositiveButton("Replace") { _, _ ->
+                                    try {
+                                        conversationRevision++
+                                        replyGate.cancel()
+                                        LocalModel.cancel()
+                                        store.restorePortable(snapshot)
+                                        draftText = ""
+                                        backupBusy = false
+                                        navigateTo("Chat")
+                                        toast("Encrypted backup restored")
+                                    } catch (e: Exception) {
+                                        backupBusy = false
+                                        toast("Restore failed; original data kept: ${e.message}")
+                                    }
+                                }.show()
+                        }
+                    } catch (e: Exception) {
+                        runOnUiThread {
+                            backupBusy = false
+                            toast("Backup unlock/validation failed: incorrect password or invalid file")
+                        }
+                    } finally {
+                        pass.fill(0.toChar())
+                    }
+                }
+            }.show()
+    }
+
     private fun chooseModel() {
         val i = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
             addCategory(Intent.CATEGORY_OPENABLE)
@@ -814,6 +1025,20 @@ class MainActivity : Activity() {
     @Deprecated("Activity result retained to keep this native Android starter dependency-light")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == requestBackupCreate) {
+            if (resultCode == RESULT_OK && data?.data != null) finishBackupExport(data.data!!)
+            else {
+                pendingEncryptedExport?.fill(0)
+                pendingEncryptedExport = null
+                backupBusy = false
+            }
+            return
+        }
+        if (requestCode == requestBackupOpen) {
+            if (resultCode == RESULT_OK && data?.data != null) beginBackupImport(data.data!!)
+            else backupBusy = false
+            return
+        }
         if (resultCode != RESULT_OK || data?.data == null) return
         val uri = data.data!!
         when (requestCode) {
@@ -921,6 +1146,8 @@ class MainActivity : Activity() {
     override fun onDestroy() {
         replyGate.cancel()
         LocalModel.cancel()
+        pendingEncryptedExport?.fill(0)
+        pendingEncryptedExport = null
         super.onDestroy()
         // Do not unload the process-wide singleton during Activity recreation:
         // the replacement Activity may already be using the same local model.

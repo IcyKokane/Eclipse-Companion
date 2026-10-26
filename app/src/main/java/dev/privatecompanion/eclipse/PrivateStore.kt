@@ -13,6 +13,8 @@ import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
+data class PortableSnapshot(val profile: CompanionProfile, val messages: List<ChatEntry>)
+
 class PrivateStore(private val context: Context) {
     private val file = AtomicFile(File(context.filesDir, "private_state.enc"))
     private val alias = "eclipse_companion_aes_v1"
@@ -94,7 +96,8 @@ class PrivateStore(private val context: Context) {
         if (messages.size > 1000) messages.subList(0, messages.size - 1000).clear()
     }
 
-    fun save() {
+    /** Canonical snapshot shared by Android Keystore storage and portable export. */
+    private fun serializePayload(): JSONObject {
         val person = JSONObject().apply {
             put("name", profile.name.take(60)); put("preset", profile.preset)
             put("adultMode", profile.adultMode); put("memories", profile.memories.take(3000))
@@ -124,6 +127,92 @@ class PrivateStore(private val context: Context) {
                 }
             })
         }
+        return root
+    }
+
+    /** Only expose in-memory bytes, never plaintext files. Caller encrypts before the SAF picker. */
+    fun exportPlaintextSnapshot(): ByteArray =
+        serializePayload().toString().toByteArray(Charsets.UTF_8)
+
+    /** Validate every restored field and record BEFORE mutating the current encrypted store. */
+    fun decodePortable(archive: ByteArray, passphrase: CharArray): PortableSnapshot {
+        val plain = PortableBackup.decrypt(archive, passphrase)
+        val root = try {
+            JSONObject(String(plain, Charsets.UTF_8))
+        } finally {
+            plain.fill(0)
+        }
+        require(root.getInt("schema") == 2) { "Unsupported backup schema" }
+        val p = root.getJSONObject("profile")
+        val t = p.getJSONObject("traits")
+        val a = p.getJSONObject("appearance")
+        fun string(o: JSONObject, name: String, max: Int): String {
+            val raw = o.get(name)
+            require(raw is String && raw.length <= max) { "Invalid backup field: $name" }
+            return raw
+        }
+        fun trait(name: String): Int = t.getInt(name).also {
+            require(it in 0..100) { "Invalid personality trait: $name" }
+        }
+        val name = string(p, "name", 60)
+        require(name.isNotBlank()) { "Backup companion name is blank" }
+        val preset = string(p, "preset", 30)
+        require(preset in CompanionLogic.presets.keys) { "Unknown companion preset" }
+        val style = string(p, "conversationStyle", 30)
+        val pace = string(p, "relationshipPace", 30)
+        require(style in CompanionLogic.conversationStyles && pace in CompanionLogic.relationshipPaces) {
+            "Unsupported style or pace"
+        }
+        val appearance = Appearance(
+            string(a, "hair", 30), string(a, "eyes", 30), string(a, "skin", 30),
+            string(a, "outfit", 30), string(a, "style", 30)
+        )
+        val profile = CompanionProfile(
+            name = name, preset = preset,
+            traits = Traits(trait("warmth"), trait("playfulness"), trait("confidence"),
+                trait("romance"), trait("humor"), trait("curiosity"), trait("initiative")),
+            appearance = appearance,
+            adultMode = p.getBoolean("adultMode"),
+            memories = string(p, "memories", 3000),
+            conversationStyle = style,
+            relationshipPace = pace,
+            interests = string(p, "interests", 500)
+        )
+        val history = root.getJSONArray("messages")
+        require(history.length() <= 1000) { "Backup has too many messages" }
+        val messages = ArrayList<ChatEntry>(history.length())
+        for (i in 0 until history.length()) {
+            val item = history.getJSONObject(i)
+            val role = string(item, "role", 10)
+            require(CompanionLogic.requireValidRole(role)) { "Unrecognized chat role" }
+            val content = string(item, "content", 3000)
+            val timestamp = item.getLong("createdAt")
+            require(timestamp >= 0L) { "Invalid chat timestamp" }
+            messages.add(ChatEntry(role, content, timestamp))
+        }
+        return PortableSnapshot(profile, messages)
+    }
+
+    /** Strong transaction boundary: if Android Keystore or disk fails, restore in-memory state. */
+    fun restorePortable(snapshot: PortableSnapshot) {
+        require(ageConfirmed) { "Age confirmation required before importing a backup" }
+        val oldProfile = profile
+        val oldMessages = messages.toList()
+        try {
+            profile = snapshot.profile
+            messages.clear()
+            messages.addAll(snapshot.messages)
+            save()
+        } catch (e: Exception) {
+            profile = oldProfile
+            messages.clear()
+            messages.addAll(oldMessages)
+            throw e
+        }
+    }
+
+    fun save() {
+        val root = serializePayload()
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         // AndroidKeyStore forbids caller-supplied GCM IVs for encryption by default.
         // Let the provider generate a fresh random nonce and persist its 12 bytes.

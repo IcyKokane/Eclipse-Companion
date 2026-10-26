@@ -29,7 +29,7 @@ assert 'Graphic Novel' in activity and 'Monochrome' in activity
 assert 'ECLIPSE_ERROR:' in model
 assert '}.onFailure { error ->' in activity
 assert 'd81235049384534c167caea52b85a694f6103d14' in read('scripts/setup-llama.sh')
-assert 'versionName = "0.4.6"' in read('app/build.gradle.kts')
+assert 'versionName = "0.4.7"' in read('app/build.gradle.kts')
 assert 'android.permission.ACCESS_NETWORK_STATE' not in manifest
 assert 'messages.takeLast(1000)' in secure
 assert 'nativeCancel' in model and 'nativeResetCancel' in model
@@ -43,8 +43,8 @@ assert 'stop_requested.store(true' in read('app/src/main/cpp/bridge.cpp')
 assert 'roles.erase(roles.begin() + 1, roles.begin() + 1 + discard)' in read('app/src/main/cpp/bridge.cpp')
 assert 'llama_sampler_accept' in read('app/src/main/cpp/bridge.cpp')
 assert 'model_previous.bak' in secure
-assert 'versionCode = 10' in read('app/build.gradle.kts')
-assert 'EclipseCompanion-v0.4.6-guided-gguf-setup-apk' in read('.github/workflows/android-debug.yml')
+assert 'versionCode = 11' in read('app/build.gradle.kts')
+assert 'EclipseCompanion-v0.4.7-backup-test-apk' in read('.github/workflows/android-debug.yml')
 assert 'replyGate.mayCommit(ticket)' in activity
 assert 'replyGate.cancel()' in activity
 assert 'override fun onStop()' in activity
@@ -74,8 +74,8 @@ assert 'setSingleChoiceItems(' in activity
 assert 'Screen capture: ALLOWED' in activity and 'Screen capture: BLOCKED' in activity
 assert '"screenshotsAllowed"' not in secure, 'Screenshot permission must never persist'
 assert 'android:name="dev.privatecompanion.eclipse.MainActivity"' in manifest
-assert 'applicationIdSuffix = ".preview46"' in read('app/build.gradle.kts')
-assert 'Eclipse Model Test 0.4.6' in read('app/build.gradle.kts')
+assert 'applicationIdSuffix = ".preview47"' in read('app/build.gradle.kts')
+assert 'Eclipse Backup Test 0.4.7' in read('app/build.gradle.kts')
 assert 'WindowInsets.Type.ime()' in activity
 assert 'MobileWindowPadding.resolve(' in activity
 assert 'MobileWindowPaddingTest.kt' in '\n'.join(p.name for p in (root / 'app/src/test/java/dev/privatecompanion/eclipse').glob('*'))
@@ -111,4 +111,21 @@ assert 'installedModelDescription()' in activity
 assert 'ModelSetupGuide.checkImport(size, filesDir.usableSpace)' in activity
 assert 'freeBytes() >= reserveFreeBytes' in read('app/src/main/java/dev/privatecompanion/eclipse/ModelFiles.kt')
 assert 'ModelSetupGuideTest.kt' in '\n'.join(p.name for p in (root / 'app/src/test/java/dev/privatecompanion/eclipse').glob('*'))
-print('PASS: guided GGUF setup + existing offline, privacy and build source assertions')
+backup = read('app/src/main/java/dev/privatecompanion/eclipse/PortableBackup.kt')
+assert 'PBKDF2WithHmacSHA256' in backup and '250_000' in backup
+assert 'AES/GCM/NoPadding' in backup and 'cipher.updateAAD(' in backup
+assert 'MAX_BACKUP_BYTES' in backup and 'readBounded(' in backup
+assert 'PortableBackupTest.kt' in '\n'.join(p.name for p in (root / 'app/src/test/java/dev/privatecompanion/eclipse').glob('*'))
+assert 'exportPlaintextSnapshot()' in secure
+assert 'decodePortable(archive: ByteArray, passphrase: CharArray)' in secure
+assert 'fun restorePortable(snapshot: PortableSnapshot)' in secure
+assert 'oldMessages = messages.toList()' in secure and 'messages.addAll(oldMessages)' in secure
+assert 'Export encrypted chats & settings' in activity
+assert 'Import encrypted chats & settings' in activity
+assert 'requestBackupCreate = 203' in activity and 'requestBackupOpen = 204' in activity
+assert 'Intent.ACTION_CREATE_DOCUMENT' in activity and 'Intent.ACTION_OPEN_DOCUMENT' in activity
+assert 'Backup unlock/validation failed' in activity
+assert 'Replace chats and character settings?' in activity
+assert 'pendingEncryptedExport?.fill(0)' in activity
+assert 'ModelFiles.importInto' in activity
+print('PASS: V0.4.7 encrypted backup, offline/privacy/build source assertions')

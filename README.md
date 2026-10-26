@@ -1,4 +1,35 @@
-# Eclipse Companion · V0.4.6 Guided Offline Model Setup
+# Eclipse Companion · V0.4.7 Portable Encrypted Backup Preview
+
+**V0.4.7 is a development preview.** Device validation, long-term release signing and backup compatibility across future versions remain pending.
+
+## New in V0.4.7 — encrypted chat and character backup
+
+- From **Privacy → Portable encrypted backup**, export your companion personality, settings, memories and last 1,000 chat messages as one password-protected `.eclipsebackup` document using Android's system document picker.
+- Import a compatible backup file from your phone's storage. Eclipse decrypts and validates the file **before** showing the profile name/message count and requiring a separate confirmation to replace your existing local settings and chat history.
+- Archives use **AES-256-GCM authenticated encryption**, a distinct random 16-byte salt and 12-byte nonce per export, with a key derived by **PBKDF2-HMAC-SHA256 at 250,000 iterations** from a user-chosen password of at least 12 characters. Header, contents and format version are authenticated; wrong passwords or modified bytes fail closed.
+- Only encrypted archive bytes are written to shared Android storage. Passwords are not stored. Import is bounded (maximum roughly 16 MiB of decrypted JSON); invalid or oversized data is rejected before the current encrypted app store is modified. If the local Keystore or disk write fails during import, old settings and chats are restored in memory, and AtomicFile maintains the previous committed encrypted state.
+- No internet permission, accounts, uploaded data or cloud services. Backup read/write is through the user's Android system file picker.
+
+**Important limitations:** The archive contains **settings and conversation text only**. It does **not** include portrait/reference images, any downloaded GGUF weights, or the Android Keystore key. Existing V0.4.1–V0.4.6 installs cannot export the new format, since those versions do not have this feature; this adds migration capability for V0.4.7 and later builds, not retroactive access to older apps' isolated sandboxes. Keep older installations holding valuable data.
+
+**Password warning:** Losing the backup password makes the document unrecoverable. Choose a strong, unique password and keep it safely. A document provider failure may leave a partial encrypted file in shared storage; delete it and retry if write fails.
+
+## Installation and testing
+
+This debug milestone uses an independent Android package `dev.privatecompanion.eclipse.preview47`, shown as **Eclipse Backup Test 0.4.7**. It will not overwrite or erase earlier Eclipse Companion builds.
+
+1. Confirm 18+ and create a character and a short conversation (a GGUF model is only needed to generate AI replies).
+2. In Privacy, choose **Export encrypted chats & settings** and enter the same password twice.
+3. Save the `.eclipsebackup` file to a suitable Android document folder.
+4. Change the character name or memories, then choose **Import encrypted chats & settings**, select the file and enter the password.
+5. Review the confirmation showing the archive's profile name and message count. Choose **Replace** to restore, or **Keep current data** to cancel without changes.
+6. Test a wrong password and an interrupted picker; neither should change the current data. Models and portraits must remain untouched during restore.
+
+The next engineering priority is using a *consistently signed* Android APK so future versions can update the same package without needing a fresh install. GitHub Actions debug signing currently varies across build workers. The archive provides a forward migration mechanism, not a substitute for stable release signing.
+
+---
+
+## V0.4.6 Guided Offline Model Setup (previous milestone)
 
 **Development preview: built for Android testing, not yet verified on a physical phone.** No account, app INTERNET permission, online chat endpoint, bundled GGUF weights or automatic background activity.
 
