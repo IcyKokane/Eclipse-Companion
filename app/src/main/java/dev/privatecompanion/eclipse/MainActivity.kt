@@ -840,7 +840,7 @@ class MainActivity : Activity() {
                 val stream = contentResolver.openInputStream(uri) ?: error("Cannot open model file")
                 var lastProgress = 0L
                 // Serial worker ensures existing generation finishes before model replacement.
-                val copied = ModelFiles.importInto(filesDir, stream) { count ->
+                val copied = ModelFiles.importInto(filesDir, stream, progress = { count ->
                     if (count - lastProgress >= 64L * 1024 * 1024) {
                         lastProgress = count
                         runOnUiThread {
@@ -848,7 +848,7 @@ class MainActivity : Activity() {
                             if (pane == "Privacy") render()
                         }
                     }
-                }
+                })
                 // Unload old weights before the owner requests the new model.
                 LocalModel.unload()
                 runOnUiThread {
