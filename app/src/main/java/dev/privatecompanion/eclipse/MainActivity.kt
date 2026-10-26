@@ -887,7 +887,7 @@ class MainActivity : Activity() {
                                 }
                             } finally {
                                 plain.fill(0)
-                                pass.fill('\\u0000')
+                                pass.fill(0.toChar())
                             }
                         }
                     }
@@ -895,7 +895,7 @@ class MainActivity : Activity() {
                     backupBusy = false
                     toast("Cannot prepare backup: ${e.message}")
                 } finally {
-                    confirm.fill('\\u0000')
+                    confirm.fill(0.toChar())
                 }
             }.show()
     }
@@ -1001,7 +1001,7 @@ class MainActivity : Activity() {
                             toast("Backup unlock/validation failed: incorrect password or invalid file")
                         }
                     } finally {
-                        pass.fill('\\u0000')
+                        pass.fill(0.toChar())
                     }
                 }
             }.show()
