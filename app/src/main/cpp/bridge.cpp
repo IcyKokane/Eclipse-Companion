@@ -169,7 +169,7 @@ Java_dev_privatecompanion_eclipse_LocalModel_nativeReply(JNIEnv* env, jobject, j
     // Generated tokens may remain in KV memory; truncate them before processing
     // this prompt. If partial removal is unsupported (e.g. hybrid recurrent model),
     // fall back to a full prefill. This never caches private data on disk.
-    const auto* mem = llama_get_memory(ctx);
+    auto mem = llama_get_memory(ctx);
     size_t reused = eclipse_cache::reusable_prefix(cached_prompt_tokens, tokens);
     if (reused > 0 &&
         (llama_memory_seq_pos_min(mem, 0) != 0 ||
