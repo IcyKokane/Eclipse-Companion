@@ -1,4 +1,33 @@
-# Eclipse Companion · V0.4.7 Portable Encrypted Backup Preview
+# Eclipse Companion · V0.4.8 Cleaner Chat UI and Faster Local Replies
+
+**Android development preview.** This release addresses actual owner screenshot feedback from a V0.4.6 phone build: oversized 2×2 navigation buttons, crowded Send/Ideas/Stop controls, an ornate inherited Android font, and a long wait before local model responses became visible.
+
+## V0.4.8 implementation
+
+- **Compact futuristic chat interface:** slim navy header, visible offline indicator, four horizontally aligned navigation buttons with a clear selected state, accessible sans-serif text independent of decorative system fonts, cleaner panel colors, small portrait header, subtle colored borders and cyan/violet accent labels.
+- **Message layout:** distinct user-right and companion-left chat bubbles, a gutter around messages, 12dp separation and selectable conversation text. Chat history remains vertically scrollable while the composer stays docked outside it and respects Android keyboard insets.
+- **Composer no longer overlaps:** an inset message field and one 50dp-tall button row with a minimum 10dp gap. Send changes to **Stop response** while generating; **Retry reply** replaces Send when there is an unanswered user message and no typed draft, rather than adding an extra full-width action row.
+- **Shorter CPU inference:** on-device responses now use **Quick (default) 96 output tokens and 6 recent messages**, **Balanced 160 tokens and 9 messages** or **Detailed 240 tokens and 12 messages**. The preference is stored in the encrypted private store, and future portable backups preserve it. Choose in **Privacy → Response speed**. Quick lowers work; it cannot guarantee any fixed response time or model performance on a specific phone.
+- **Streaming preview:** llama.cpp emits the first generated token, then partial text periodically into the active chat bubble. Partial responses are **never saved**; only successful completed replies enter the encrypted conversation history. Stop, backgrounding, erasing chats, and stale-session guards still cancel/discard output. Prefill and CPU latency before first token can remain substantial.
+- **Elapsed-time hint:** completed replies display measured local elapsed time to make performance troubleshooting more concrete.
+
+## Important installation and test notes
+
+Android test package `dev.privatecompanion.eclipse.preview48`, launcher label **Eclipse UI Test 0.4.8**. Installs alongside V0.4.1–V0.4.7 without erasing existing installations. Because earlier debug versions each used different package IDs, V0.4.8 **does not automatically inherit** the local model, portrait or messages from V0.4.6. Users can import a GGUF again and in V0.4.7+ use a password-protected backup to transfer chat/settings. Keep old installs holding valued data.
+
+Suggested phone test:
+1. Open Eclipse V0.4.8 and verify that the tabs fit in one row, text uses plain sans-serif, message bubbles are separated and Send/Ideas never touch, including with keyboard open.
+2. Use Privacy to import and load a small compatible GGUF.
+3. In Privacy → Response speed select **Quick**.
+4. Send a short message, verify that partial reply text appears before the final reply, observe elapsed-time status, then compare Balanced/Detailed.
+5. Tap Stop during generation and verify partial text disappears without being saved; tap Retry and confirm a successful reply is saved.
+6. Check adult-mode, appearance, encrypted backups and temporary screenshot consent still work.
+
+**Known limitations:** CPU-only llama.cpp remains the backend, so large models and long prompts may still be slow. Full KV-cache reuse, device-specific multithreading optimization and GPU acceleration are future work. Streaming UI and performance must be verified on physical hardware; source/CI tests alone do not establish real-device performance. Stable release signing is still pending.
+
+---
+
+## V0.4.7 Portable Encrypted Backup Preview (previous milestone)
 
 **V0.4.7 is a development preview.** Device validation, long-term release signing and backup compatibility across future versions remain pending.
 
