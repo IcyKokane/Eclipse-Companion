@@ -44,6 +44,7 @@ class MainActivity : Activity() {
     private lateinit var composerDock: LinearLayout
     private var composerEdit: EditText? = null
     private var streamingPreview = ""
+    private var lastInferenceDiagnostics = ""
     private var previewLabel: TextView? = null
     private val navigationButtons = linkedMapOf<String, Button>()
     private var lastAppliedPadding = EdgePadding(0, 0, 0, 0)
@@ -583,6 +584,9 @@ class MainActivity : Activity() {
             val result = runCatching {
                 LocalModel.respond(profileSnapshot, historySnapshot, lengthSnapshot, progress)
             }
+            val diagnostics = if (result.isSuccess) {
+                runCatching { LocalModel.lastReplyDiagnostics() }.getOrDefault("")
+            } else ""
             runOnUiThread {
                 if (isFinishing || isDestroyed) return@runOnUiThread
                 if (!replyGate.mayCommit(ticket) || revision != conversationRevision || store.messages.lastOrNull() != last) {
@@ -600,6 +604,7 @@ class MainActivity : Activity() {
                         store.save()
                         conversationRevision++
                         val seconds = (android.os.SystemClock.elapsedRealtime() - startedAt) / 1000.0
+                        lastInferenceDiagnostics = diagnostics
                         status = "Reply ready in ${"%.1f".format(java.util.Locale.US, seconds)} s · ${lengthSnapshot.title}"
                     } catch (e: Exception) {
                         store.messages.removeAt(store.messages.lastIndex)
@@ -860,6 +865,17 @@ class MainActivity : Activity() {
         })
         space(18)
         section("Response speed")
+        if (lastInferenceDiagnostics.isNotBlank()) {
+            content.addView(label("Last reply · $lastInferenceDiagnostics", 12f, muted))
+            space(6)
+            content.addView(button("Copy local response performance") {
+                val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                clipboard.setPrimaryClip(ClipData.newPlainText("Eclipse local performance",
+                    lastInferenceDiagnostics))
+                toast("Copied token counts and timings only, no chat contents")
+            })
+            space(12)
+        }
         content.addView(label(
             "Quick (default) generates fewer tokens with less recent history. " +
                 "Detailed replies can take significantly longer on a phone CPU. " +
