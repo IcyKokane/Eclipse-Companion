@@ -29,7 +29,7 @@ assert 'Graphic Novel' in activity and 'Monochrome' in activity
 assert 'ECLIPSE_ERROR:' in model
 assert '}.onFailure { error ->' in activity
 assert 'd81235049384534c167caea52b85a694f6103d14' in read('scripts/setup-llama.sh')
-assert 'versionName = "0.4.7"' in read('app/build.gradle.kts')
+assert 'versionName = "0.4.8"' in read('app/build.gradle.kts')
 assert 'android.permission.ACCESS_NETWORK_STATE' not in manifest
 assert 'messages.takeLast(1000)' in secure
 assert 'nativeCancel' in model and 'nativeResetCancel' in model
@@ -43,8 +43,8 @@ assert 'stop_requested.store(true' in read('app/src/main/cpp/bridge.cpp')
 assert 'roles.erase(roles.begin() + 1, roles.begin() + 1 + discard)' in read('app/src/main/cpp/bridge.cpp')
 assert 'llama_sampler_accept' in read('app/src/main/cpp/bridge.cpp')
 assert 'model_previous.bak' in secure
-assert 'versionCode = 11' in read('app/build.gradle.kts')
-assert 'EclipseCompanion-v0.4.7-backup-test-apk' in read('.github/workflows/android-debug.yml')
+assert 'versionCode = 12' in read('app/build.gradle.kts')
+assert 'EclipseCompanion-v0.4.8-ui-performance-apk' in read('.github/workflows/android-debug.yml')
 assert 'replyGate.mayCommit(ticket)' in activity
 assert 'replyGate.cancel()' in activity
 assert 'override fun onStop()' in activity
@@ -68,14 +68,14 @@ assert 'Cipher.ENCRYPT_MODE, key(), GCMParameterSpec' not in secure
 assert 'WindowInsets.Type.systemBars()' in activity
 assert 'WindowInsets.Type.displayCutout()' in activity
 assert 'root.requestApplyInsets()' in activity
-assert 'listOf(listOf("Chat", "Personality")' in activity
+assert 'listOf("Chat", "Personality", "Appearance", "Privacy")' in activity
 assert 'backgroundTintList = null' in activity
 assert 'setSingleChoiceItems(' in activity
 assert 'Screen capture: ALLOWED' in activity and 'Screen capture: BLOCKED' in activity
 assert '"screenshotsAllowed"' not in secure, 'Screenshot permission must never persist'
 assert 'android:name="dev.privatecompanion.eclipse.MainActivity"' in manifest
-assert 'applicationIdSuffix = ".preview47"' in read('app/build.gradle.kts')
-assert 'Eclipse Backup Test 0.4.7' in read('app/build.gradle.kts')
+assert 'applicationIdSuffix = ".preview48"' in read('app/build.gradle.kts')
+assert 'Eclipse UI Test 0.4.8' in read('app/build.gradle.kts')
 assert 'WindowInsets.Type.ime()' in activity
 assert 'MobileWindowPadding.resolve(' in activity
 assert 'MobileWindowPaddingTest.kt' in '\n'.join(p.name for p in (root / 'app/src/test/java/dev/privatecompanion/eclipse').glob('*'))
@@ -96,7 +96,7 @@ assert 'composerDock.visibility = View.GONE' in activity
 assert 'composerDock.addView(edit' in activity
 assert 'ComposerPolicy.evaluate(' in activity
 assert 'actionState.showRetry' in activity and 'actionState.showStop' in activity
-assert 'composerDock.addView(actions)' in activity
+assert 'composerDock.addView(actions, LinearLayout.LayoutParams' in activity
 assert 'ComposerPolicyTest.kt' in '\n'.join(p.name for p in (root / 'app/src/test/java/dev/privatecompanion/eclipse').glob('*'))
 model_guide = read('app/src/main/java/dev/privatecompanion/eclipse/ModelSetupGuide.kt')
 assert 'QWEN_DOWNLOAD_URL' in model_guide
@@ -128,4 +128,22 @@ assert 'Backup unlock/validation failed' in activity
 assert 'Replace chats and character settings?' in activity
 assert 'pendingEncryptedExport?.fill(0)' in activity
 assert 'ModelFiles.importInto' in activity
-print('PASS: V0.4.7 encrypted backup, offline/privacy/build source assertions')
+assert 'fun interface ReplyProgress' in model
+assert 'ReplyProgress?' in model
+assert 'length.maxTokens' in model
+assert 'length.historyTurns' in model
+assert 'env->CallVoidMethod(listener, onPartial, partial)' in read('app/src/main/cpp/bridge.cpp')
+assert 'setTypeface(null, Typeface.BOLD)' not in activity
+assert 'typeface = Typeface.create(' in activity
+assert 'ChatLayout.NAV_HEIGHT_DP' in activity
+assert 'ChatLayout.COMPOSER_GAP_DP' in activity
+assert 'ChatLayout.bubbleWidth(' in activity
+assert 'streamingPreview' in activity and 'previewLabel?.text = streamingPreview' in activity
+assert 'if (actionState.showStop) "■  Stop response"' in activity
+assert 'Generate/retry reply to last message' in activity
+assert 'Reply length:' in activity
+assert 'ReplyLength.fromStored(' in secure
+assert 'replyLength' in secure
+assert 'ReplyLength.kt' in '\n'.join(p.name for p in (root / 'app/src/main/java/dev/privatecompanion/eclipse').glob('*'))
+assert 'ChatLayoutAndReplyLengthTest.kt' in '\n'.join(p.name for p in (root / 'app/src/test/java/dev/privatecompanion/eclipse').glob('*'))
+print('PASS: V0.4.8 compact UI, streamed local replies, offline/privacy/build assertions')
