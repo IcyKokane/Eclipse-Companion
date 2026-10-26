@@ -650,6 +650,39 @@ class MainActivity : Activity() {
         content.addView(label("V0.4 uses local portrait drawing and image filters, not diffusion-based AI image generation. A true image-to-image model is planned for a later Android milestone.", 13f, muted))
     }
 
+    /** The browser performs any external download; Eclipse itself never requests internet. */
+    private fun openStarterModelDownload() {
+        AlertDialog.Builder(this)
+            .setTitle("Download a local GGUF model")
+            .setMessage(
+                "Open the official Qwen 2.5 1.5B Instruct Q4_K_M file in your phone browser? " +
+                "It is about 1.12 GB. Browser internet and storage are required for this " +
+                "one-time download. Eclipse remains offline. After download, return and use " +
+                "Import GGUF model from phone. Model compatibility and speed vary by device."
+            )
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Open browser") { _, _ ->
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(ModelSetupGuide.QWEN_DOWNLOAD_URL))
+                try {
+                    startActivity(intent)
+                } catch (_: android.content.ActivityNotFoundException) {
+                    toast("No browser found. Open the Qwen GGUF download URL in a browser.")
+                }
+            }.show()
+    }
+
+    private fun installedModelDescription(): String {
+        val model = File(filesDir, "companion.gguf")
+        if (!model.exists()) return "No model imported yet."
+        return try {
+            val version = model.inputStream().use { ModelFiles.inspectHeader(it) }
+            "Imported GGUF v$version · ${ModelSetupGuide.sizeLabel(model.length())} · " +
+                if (LocalModel.ready()) "Loaded in memory" else "Not loaded into memory"
+        } catch (e: Exception) {
+            "Imported file needs attention: ${e.message ?: "GGUF header not recognized"}"
+        }
+    }
+
     private fun privacyPane() {
         section("Screen capture")
         content.addView(label(
@@ -679,16 +712,31 @@ class MainActivity : Activity() {
             12f, muted
         ))
         space(18)
-        section("Local model & privacy")
-        content.addView(label("The app has no INTERNET permission. No account or API key is used. Load a compatible local GGUF instruct/chat model for responses.", 14f, muted))
-        space()
-        content.addView(label("Model: " + if (File(filesDir, "companion.gguf").exists()) "Installed locally" else "Not imported", 15f))
-        content.addView(label("Engine: " + if (LocalModel.ready()) "Ready" else "Not loaded", 15f, violet))
-        content.addView(label(status, 13f, muted))
-        space()
-        content.addView(button("Import GGUF model from phone") { chooseModel() })
+        section("Set up an offline AI model")
+        content.addView(label(
+            "Eclipse has no INTERNET permission. Download an instruction-tuned GGUF once " +
+                "using your phone's browser, then import it from Downloads. " +
+                "The AI runs on your phone after loading.",
+            14f, muted
+        ))
         space(8)
+        content.addView(label("Step 1 · Get a GGUF model", 16f, light, true))
+        content.addView(label(
+            "Starter suggestion: Qwen 2.5 1.5B Instruct Q4_K_M (about 1.12 GB). " +
+                "Its official download opens in your browser, not inside Eclipse. " +
+                "Other compatible GGUF chat models can also be imported.",
+            13f, muted
+        ))
+        content.addView(button("Open official Qwen GGUF download") { openStarterModelDownload() })
+        space(10)
+        content.addView(label("Step 2 · Import from phone storage", 16f, light, true))
+        content.addView(button("Import GGUF model from phone") { chooseModel() })
+        content.addView(label("Saved model: ${installedModelDescription()}", 14f, light))
+        content.addView(label("Free storage: ${ModelSetupGuide.sizeLabel(filesDir.usableSpace)}", 13f, muted))
+        space(10)
+        content.addView(label("Step 3 · Load into device memory", 16f, light, true))
         content.addView(button("Load local model") { loadModel() })
+        content.addView(label(status, 13f, muted))
         space(8)
         content.addView(button("Unload model from memory") {
             if (modelBusy) { toast("Wait for the current model operation"); return@button }
@@ -787,10 +835,8 @@ class MainActivity : Activity() {
         worker.execute {
             try {
                 val size = contentResolver.openAssetFileDescriptor(uri, "r")?.use { it.length } ?: -1L
-                if (size in 0..1023) error("File is too small to be a GGUF model")
-                if (size > ModelFiles.MAX_BYTES) error("Model exceeds 8 GiB starter limit")
-                val needed = if (size > 0) size + 100L * 1024 * 1024 else 3L * 1024 * 1024 * 1024
-                if (filesDir.usableSpace < needed) error("Not enough free storage space")
+                val plan = ModelSetupGuide.checkImport(size, filesDir.usableSpace)
+                if (!plan.permitted) error(plan.explanation)
                 val stream = contentResolver.openInputStream(uri) ?: error("Cannot open model file")
                 var lastProgress = 0L
                 // Serial worker ensures existing generation finishes before model replacement.
@@ -824,6 +870,13 @@ class MainActivity : Activity() {
         if (sending || modelBusy) { toast("Finish the current model operation or reply first"); return }
         val file = File(filesDir, "companion.gguf")
         if (!file.exists()) { toast("Import a GGUF model first"); return }
+        try {
+            file.inputStream().use { ModelFiles.inspectHeader(it) }
+        } catch (e: Exception) {
+            status = "Imported file is not a supported GGUF: ${e.message}"
+            render()
+            return
+        }
         modelBusy = true
         status = "Loading model locally. This may use several GB of RAM."
         render()
