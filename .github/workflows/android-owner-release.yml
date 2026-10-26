@@ -33,7 +33,7 @@ jobs:
               exit 1
             fi
           done
-          python3 -c 'import os, re; s=re.sub(r"[:\\s]", "", os.environ["ECLIPSE_CERT_SHA256"]); assert re.fullmatch(r"[0-9a-fA-F]{64}", s), "Invalid owner certificate pin"'
+          python3 -c 'import os, re; s=re.sub(r"[:\s]", "", os.environ["ECLIPSE_CERT_SHA256"]); assert re.fullmatch(r"[0-9a-fA-F]{64}", s), "Invalid owner certificate pin"'
 
       - uses: actions/setup-java@v4
         with:
