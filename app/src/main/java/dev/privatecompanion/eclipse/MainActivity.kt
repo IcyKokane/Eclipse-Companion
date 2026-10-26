@@ -378,8 +378,40 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun chatBubble(title: String, message: String, owner: Boolean): TextView {
+        val color = if (owner) Color.rgb(36, 43, 75) else panel
+        val body = label(message, 15f, light).apply {
+            setPadding(dp(12), dp(5), dp(12), dp(12))
+            setTextIsSelectable(true)
+        }
+        val bubble = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = outlined(color, 15, if (owner) Color.rgb(78, 85, 139) else borderColor)
+            addView(label(title, 10f, if (owner) violet else cyan, true).apply {
+                setPadding(dp(12), dp(10), dp(12), dp(2))
+            })
+            addView(body)
+        }
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = if (owner) Gravity.END else Gravity.START
+            addView(bubble, LinearLayout.LayoutParams(
+                ChatLayout.bubbleWidth(resources.displayMetrics.widthPixels - dp(42)), -2
+            ))
+        }
+        content.addView(row, LinearLayout.LayoutParams(-1, -2).apply {
+            bottomMargin = dp(ChatLayout.MESSAGE_GAP_DP)
+        })
+        return body
+    }
+
     private fun chatPane() {
-        val header = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(10), dp(10), dp(10), dp(10))
+            background = outlined(Color.rgb(19, 27, 45), 18)
+        }
         val image = ImageView(this).apply {
             scaleType = ImageView.ScaleType.CENTER_CROP
             val path = File(filesDir, "portrait.png")
@@ -392,52 +424,62 @@ class MainActivity : Activity() {
             }.getOrNull()
             if (portrait != null) setImageBitmap(portrait)
             else setImageResource(android.R.drawable.ic_menu_gallery)
-            background = bg(panel, 20f)
+            background = outlined(panel, 14)
             clipToOutline = true
         }
-        header.addView(image, LinearLayout.LayoutParams(dp(84), dp(84)).apply { rightMargin = dp(12) })
+        header.addView(image, LinearLayout.LayoutParams(dp(64), dp(64)).apply { rightMargin = dp(12) })
         header.addView(LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            addView(label(store.profile.name, 23f, light, true))
-            addView(label(store.profile.preset + " · " + if (store.profile.adultMode) "Adult mode" else "Everyday mode", 14f, muted))
-            addView(label(if (LocalModel.ready()) "Local model ready" else "Model not loaded", 13f, violet))
-        })
+            addView(label(store.profile.name, 21f, light, true))
+            addView(label(store.profile.preset + " · " +
+                if (store.profile.adultMode) "Adult mode" else "Everyday mode", 12f, muted))
+            addView(label(if (LocalModel.ready()) "●  LOCAL AI READY" else "○  MODEL NOT LOADED",
+                11f, if (LocalModel.ready()) cyan else muted, true))
+        }, LinearLayout.LayoutParams(0, -2, 1f))
         content.addView(header)
-        space()
-        if (status.startsWith("Local reply failed") || status.startsWith("Generation") || sending) {
-            content.addView(label(status, 13f, muted))
-            space(4)
+        space(16)
+
+        if (sending || status.startsWith("Local reply failed") ||
+            status.startsWith("Generation") || status.startsWith("Reply ready")) {
+            content.addView(label(status, 12f, if (sending) cyan else muted))
+            space(10)
         }
         if (!LocalModel.ready()) {
             content.addView(label(
-                "A compatible local GGUF model must be imported and loaded before chat replies work. " +
-                    "Companion settings and appearance can be edited without a model.",
-                15f, muted
+                "Import a compatible GGUF model to enable private on-device replies. " +
+                    "You can customize your companion without a model.", 14f, muted
             ))
-            content.addView(button("Set up local GGUF model") { navigateTo("Privacy") })
             space(8)
+            content.addView(button("Set up local GGUF model") { navigateTo("Privacy") })
+            space(12)
         } else if (store.messages.isEmpty()) {
             content.addView(label(
-                "Your conversation starts here. Use Ideas beside Send for an editable first message.",
-                15f, muted
+                "Start a conversation, or tap Ideas to find something to talk about.", 14f, muted
             ))
+            space(12)
         }
         for (m in store.messages.takeLast(50)) {
-            val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; pad(this, 13, 10) }
-            box.background = bg(if (m.role == "user") Color.rgb(65, 52, 89) else panel)
-            box.addView(label(if (m.role == "user") "YOU" else store.profile.name.uppercase(), 12f, violet, true))
-            box.addView(label(m.content, 15f))
-            content.addView(box, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 9 })
+            chatBubble(if (m.role == "user") "YOU" else store.profile.name.uppercase(),
+                m.content, m.role == "user")
         }
-        if (store.messages.size > 50) content.addView(label("Showing the most recent 50 messages. Older messages remain saved locally.", 12f, muted))
-
+        if (sending) {
+            previewLabel = chatBubble(
+                "${store.profile.name.uppercase()} · COMPOSING",
+                streamingPreview.ifBlank { "Preparing a reply on your device…" },
+                false
+            )
+        }
+        if (store.messages.size > 50) {
+            content.addView(label("Showing the latest 50 messages. Older messages remain encrypted.", 12f, muted))
+        }
     }
 
-    /** Fixed chat input, not inside the message ScrollView. Remains reachable with the keyboard. */
+    /** Single compact dock: Send changes to Stop, so buttons never collide or stack. */
     private fun composerPane() {
-        val edit = input(draftText, "Type a message to ${store.profile.name}...", 2).apply {
-            maxLines = 4
+        val edit = input(draftText, "Message ${store.profile.name}…", 2).apply {
+            maxLines = 3
             minLines = 2
+            setPadding(dp(14), dp(12), dp(14), dp(12))
         }
         composerEdit = edit
         edit.addTextChangedListener(object : TextWatcher {
@@ -450,11 +492,26 @@ class MainActivity : Activity() {
         composerDock.addView(edit, LinearLayout.LayoutParams(-1, -2))
         val actions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         val actionState = ComposerPolicy.evaluate(sending, modelBusy, store.messages.lastOrNull()?.role)
-        val send = button(if (sending) "Thinking..." else "Send message") {
-            if (sending || modelBusy) return@button
+        val retry = actionState.showRetry && draftText.isBlank()
+        val send = button(
+            if (actionState.showStop) "■  Stop response"
+            else if (retry) "↻  Retry reply"
+            else "Send"
+        ) {
+            if (sending) {
+                replyGate.cancel()
+                LocalModel.cancel()
+                status = "Stopping local generation..."
+                if (pane == "Chat") render()
+                return@button
+            }
+            if (modelBusy) return@button
             if (!LocalModel.ready()) { toast("Load a GGUF model in Privacy first."); return@button }
             val userText = edit.text.toString().trim().take(3000)
-            if (userText.isBlank()) return@button
+            if (userText.isBlank()) {
+                if (actionState.showRetry) startReply()
+                return@button
+            }
             store.messages.add(ChatEntry("user", userText, System.currentTimeMillis()))
             try { store.save() } catch (e: Exception) {
                 store.messages.removeAt(store.messages.lastIndex)
@@ -465,25 +522,19 @@ class MainActivity : Activity() {
             conversationRevision++
             startReply()
         }
-        send.isEnabled = actionState.sendEnabled
-        actions.addView(send, LinearLayout.LayoutParams(0, dp(52), 2f).apply {
-            rightMargin = dp(6)
+        send.isEnabled = actionState.sendEnabled || actionState.showStop
+        if (actionState.showStop) send.contentDescription = "Stop current response"
+        if (actionState.showRetry) send.contentDescription = "Generate/retry reply to last message"
+        actions.addView(send, LinearLayout.LayoutParams(0, dp(ChatLayout.COMPOSER_BUTTON_HEIGHT_DP), 2f))
+        actions.addView(button("Ideas") { showStarterDialog() }.apply {
+            background = outlined(panel, 13, borderColor)
+            setTextColor(light)
+        }, LinearLayout.LayoutParams(0, dp(ChatLayout.COMPOSER_BUTTON_HEIGHT_DP), 1f).apply {
+            leftMargin = dp(ChatLayout.COMPOSER_GAP_DP)
         })
-        actions.addView(button("Ideas") { showStarterDialog() },
-            LinearLayout.LayoutParams(0, dp(52), 1f))
-        composerDock.addView(actions)
-        if (actionState.showRetry) {
-            composerDock.addView(button("Generate/retry reply to last message") { startReply() },
-                LinearLayout.LayoutParams(-1, dp(48)))
-        }
-        if (actionState.showStop) {
-            composerDock.addView(button("Stop current response") {
-                replyGate.cancel()
-                LocalModel.cancel()
-                status = "Stopping local generation..."
-                if (pane == "Chat") render()
-            }, LinearLayout.LayoutParams(-1, dp(48)))
-        }
+        composerDock.addView(actions, LinearLayout.LayoutParams(-1, -2).apply {
+            topMargin = dp(ChatLayout.COMPOSER_GAP_DP)
+        })
     }
 
     private fun showStarterDialog() {
