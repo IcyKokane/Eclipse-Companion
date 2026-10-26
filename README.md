@@ -1,4 +1,32 @@
-# Eclipse Companion · V0.4.8 Cleaner Chat UI and Faster Local Replies
+# Eclipse Companion · V0.4.9 Incremental Offline Prompt Cache
+
+**Android development preview.** This release targets the slow replies reported from the owner's phone after V0.4.8 introduced shorter generation modes and streamed previews. No app INTERNET permission, server-side inference or cloud state is introduced.
+
+## V0.4.9 — safe token prefix reuse
+
+- Instead of clearing the entire llama.cpp context on every chat reply, Eclipse now compares the new tokenized prompt with the **previous successfully processed prompt** and retains the longest safe token-identical prefix. Previous generated tokens and any mismatching suffix are removed from the current llama.cpp KV state before evaluating new tokens.
+- **Correctness safeguard:** at least the last prompt token is always decoded again to obtain valid fresh logits. Truncation is attempted only if the KV sequence is continuous from position zero; when llama.cpp reports unsupported partial KV removal, the engine clears KV and fully recomputes the prompt. Model unloading/replacement invalidates all cached tokens.
+- **Cancellation guard:** failed or canceled replies discard the cache bookkeeping. On the next request, the inference engine falls back to a full prefill rather than trusting partially processed state. No KV data is saved to disk or transferred over a network.
+- **Performance diagnostics:** the app shows per-reply token counts and time spent in prefill versus generation under **Privacy → Response speed**. Tap **Copy local response performance** to copy counts/timings for troubleshooting; this explicitly excludes message text and memories.
+- Ten standalone C++ prefix-policy regression cases are run by GitHub Actions before the existing JVM/native Android build and offline APK audit. They cover exact repeats, changed prefixes, shortened inputs, empty prompts, and the minimum-last-token rule.
+- Preserves the compact 0.4.8 UI, partial-text preview, Quick/Balanced/Detailed output modes, encrypted history/backup functionality and privacy defaults.
+
+## What to test
+
+Installed development name: **Eclipse Cache Test 0.4.9**, Android package `dev.privatecompanion.eclipse.preview49`. It is a **separate** install, not an upgrade to V0.4.8, so don't uninstall earlier apps containing irreplaceable chats, images or models.
+
+1. Import/load a small compatible GGUF model in Privacy; leave Quick reply mode selected.
+2. Send two or three short messages in the *same chat* (the first message usually cannot reuse any prompt tokens).
+3. After the second and third answers, open Privacy → Response speed. Read the reported `Prefill: X cached, Y computed (Z ms)` and generation tokens/time.
+4. Compare first versus follow-up responses on your phone, which is the only reliable way to assess actual speed.
+5. Change personality or delete conversation, then send a new message to confirm cache invalidation happens when the input changes.
+6. Stop a response midway and Retry; stale partial replies must not be saved.
+
+**Limits:** Cache hits depend on exact tokenizer prefix matching, model architecture and available RAM. This optimization reduces *repeated prefill*, not the CPU cost of generating each new token. There is no GPU acceleration, full context persistence after the app exits, or model benchmark guarantee yet. Android device validation is still required. Consistent APK signing for future in-place upgrades remains a separate milestone.
+
+---
+
+## V0.4.8 Cleaner Chat UI and Faster Local Replies (previous milestone)
 
 **Android development preview.** This release addresses actual owner screenshot feedback from a V0.4.6 phone build: oversized 2×2 navigation buttons, crowded Send/Ideas/Stop controls, an ornate inherited Android font, and a long wait before local model responses became visible.
 

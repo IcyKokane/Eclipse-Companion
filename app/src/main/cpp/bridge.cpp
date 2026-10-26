@@ -1,10 +1,12 @@
 #include <jni.h>
 #include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <mutex>
 #include <string>
 #include <vector>
 #include "llama.h"
+#include "prompt_cache_policy.h"
 
 namespace {
 std::mutex gate;
@@ -13,6 +15,9 @@ llama_model* model = nullptr;
 llama_context* ctx = nullptr;
 bool initialized = false;
 constexpr int kContext = 4096;
+// Cache is process-local, encrypted-file independent, and always invalidated on unload.
+std::vector<llama_token> cached_prompt_tokens;
+std::string last_reply_metrics;
 
 std::string to_string(JNIEnv* env, jstring input) {
     if (!input) return "";
@@ -45,6 +50,8 @@ jstring from_utf8(JNIEnv* env, const std::string& s) {
     return result;
 }
 void unload() {
+    cached_prompt_tokens.clear();
+    last_reply_metrics.clear();
     if (ctx) { llama_free(ctx); ctx = nullptr; }
     if (model) { llama_model_free(model); model = nullptr; }
 }
@@ -158,7 +165,21 @@ Java_dev_privatecompanion_eclipse_LocalModel_nativeReply(JNIEnv* env, jobject, j
                        tokens.data(), nPrompt, true, true) != nPrompt)
         return from_utf8(env, "ECLIPSE_ERROR: Unable to tokenize conversation");
 
-    llama_memory_clear(llama_get_memory(ctx), true);
+    // Preserve only an identical, fully processed prefix from the preceding prompt.
+    // Generated tokens may remain in KV memory; truncate them before processing
+    // this prompt. If partial removal is unsupported (e.g. hybrid recurrent model),
+    // fall back to a full prefill. This never caches private data on disk.
+    auto mem = llama_get_memory(ctx);
+    size_t reused = eclipse_cache::reusable_prefix(cached_prompt_tokens, tokens);
+    if (reused > 0 &&
+        (llama_memory_seq_pos_min(mem, 0) != 0 ||
+         llama_memory_seq_pos_max(mem, 0) < static_cast<llama_pos>(reused - 1) ||
+         !llama_memory_seq_rm(mem, 0, static_cast<llama_pos>(reused), -1))) {
+        reused = 0;
+    }
+    if (reused == 0) llama_memory_clear(mem, true);
+    cached_prompt_tokens.clear();
+    const auto prefill_started = std::chrono::steady_clock::now();
     auto* batch = llama_batch_ext_init(ctx);
     if (!batch) return from_utf8(env, "ECLIPSE_ERROR: Unable to allocate inference batch");
     auto* sampler = llama_sampler_chain_init(llama_sampler_chain_default_params());
@@ -169,7 +190,7 @@ Java_dev_privatecompanion_eclipse_LocalModel_nativeReply(JNIEnv* env, jobject, j
     llama_sampler_chain_add(sampler, llama_sampler_init_dist(LLAMA_DEFAULT_SEED));
     std::string answer;
     bool ok = true;
-    int pos = 0;
+    int pos = static_cast<int>(reused);
     while (pos < nPrompt) {
         if (stop_requested.load(std::memory_order_acquire)) { ok = false; break; }
         const int chunk = std::min(512, nPrompt - pos);
@@ -177,6 +198,8 @@ Java_dev_privatecompanion_eclipse_LocalModel_nativeReply(JNIEnv* env, jobject, j
             llama_process(ctx, LLAMA_PROCESS_TYPE_DECODE, batch) != 0) { ok = false; break; }
         pos += chunk;
     }
+    const auto prefill_finished = std::chrono::steady_clock::now();
+    int generated = 0;
     if (ok) {
         for (int i = 0; i < predict; ++i) {
             if (stop_requested.load(std::memory_order_acquire)) { ok = false; break; }
@@ -187,6 +210,7 @@ Java_dev_privatecompanion_eclipse_LocalModel_nativeReply(JNIEnv* env, jobject, j
             int count = llama_token_to_piece(vocab, token, piece, sizeof(piece), 0, true);
             if (count < 0) { ok = false; break; }
             answer.append(piece, count);
+            ++generated;
             // First token feedback, then updates every 8 tokens to avoid UI flood.
             if (listener && onPartial && (i == 0 || (i % 8) == 7)) {
                 jstring partial = from_utf8(env, answer);
@@ -203,13 +227,38 @@ Java_dev_privatecompanion_eclipse_LocalModel_nativeReply(JNIEnv* env, jobject, j
             ++pos;
         }
     }
+    const auto generation_finished = std::chrono::steady_clock::now();
     llama_sampler_free(sampler);
     llama_batch_ext_free(batch);
+    const auto prefill_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+        prefill_finished - prefill_started).count();
+    const auto generation_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+        generation_finished - prefill_finished).count();
+    if (ok && !stop_requested.load(std::memory_order_acquire) && !answer.empty()) {
+        // Keep only decoded input prompt tokens as the safe next-turn baseline.
+        // Old reply tokens physically in KV are discarded by seq_rm next turn.
+        cached_prompt_tokens = std::move(tokens);
+        last_reply_metrics = "Prefill: " + std::to_string(reused) + " cached, " +
+            std::to_string(nPrompt - static_cast<int>(reused)) + " computed (" +
+            std::to_string(prefill_ms) + " ms); generated " +
+            std::to_string(generated) + " tokens (" +
+            std::to_string(generation_ms) + " ms)";
+    } else {
+        cached_prompt_tokens.clear();
+        last_reply_metrics.clear();
+    }
     if (!ok) answer = stop_requested.load(std::memory_order_acquire)
         ? "ECLIPSE_ERROR: Generation cancelled"
         : "ECLIPSE_ERROR: Inference failed or device ran out of memory";
     if (answer.empty()) answer = "ECLIPSE_ERROR: Model produced no text";
     return from_utf8(env, answer);
+}
+
+// Only timings and token counts; never conversation contents.
+extern "C" JNIEXPORT jstring JNICALL
+Java_dev_privatecompanion_eclipse_LocalModel_nativeReplyDiagnostics(JNIEnv* env, jobject) {
+    std::lock_guard<std::mutex> guard(gate);
+    return from_utf8(env, last_reply_metrics);
 }
 
 extern "C" JNIEXPORT void JNICALL

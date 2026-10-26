@@ -11,6 +11,7 @@ object LocalModel {
     private external fun nativeUnload()
     private external fun nativeCancel()
     private external fun nativeResetCancel()
+    private external fun nativeReplyDiagnostics(): String
     @Volatile private var cancelRequested = false
 
     fun supported(): Boolean {
@@ -28,6 +29,10 @@ object LocalModel {
     }
 
     fun ready(): Boolean = loadedModel
+
+    /** CPU-only timing/counter diagnostics; never includes prompts or personal chat text. */
+    @Synchronized fun lastReplyDiagnostics(): String =
+        if (loadedLibrary && loadedModel) nativeReplyDiagnostics() else ""
 
     @Synchronized fun respond(
         profile: CompanionProfile, history: List<ChatEntry>,

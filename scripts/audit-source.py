@@ -29,7 +29,7 @@ assert 'Graphic Novel' in activity and 'Monochrome' in activity
 assert 'ECLIPSE_ERROR:' in model
 assert '}.onFailure { error ->' in activity
 assert 'd81235049384534c167caea52b85a694f6103d14' in read('scripts/setup-llama.sh')
-assert 'versionName = "0.4.8"' in read('app/build.gradle.kts')
+assert 'versionName = "0.4.9"' in read('app/build.gradle.kts')
 assert 'android.permission.ACCESS_NETWORK_STATE' not in manifest
 assert 'messages.takeLast(1000)' in secure
 assert 'nativeCancel' in model and 'nativeResetCancel' in model
@@ -43,8 +43,8 @@ assert 'stop_requested.store(true' in read('app/src/main/cpp/bridge.cpp')
 assert 'roles.erase(roles.begin() + 1, roles.begin() + 1 + discard)' in read('app/src/main/cpp/bridge.cpp')
 assert 'llama_sampler_accept' in read('app/src/main/cpp/bridge.cpp')
 assert 'model_previous.bak' in secure
-assert 'versionCode = 12' in read('app/build.gradle.kts')
-assert 'EclipseCompanion-v0.4.8-ui-performance-apk' in read('.github/workflows/android-debug.yml')
+assert 'versionCode = 13' in read('app/build.gradle.kts')
+assert 'EclipseCompanion-v0.4.9-prefix-cache-apk' in read('.github/workflows/android-debug.yml')
 assert 'replyGate.mayCommit(ticket)' in activity
 assert 'replyGate.cancel()' in activity
 assert 'override fun onStop()' in activity
@@ -74,8 +74,8 @@ assert 'setSingleChoiceItems(' in activity
 assert 'Screen capture: ALLOWED' in activity and 'Screen capture: BLOCKED' in activity
 assert '"screenshotsAllowed"' not in secure, 'Screenshot permission must never persist'
 assert 'android:name="dev.privatecompanion.eclipse.MainActivity"' in manifest
-assert 'applicationIdSuffix = ".preview48"' in read('app/build.gradle.kts')
-assert 'Eclipse UI Test 0.4.8' in read('app/build.gradle.kts')
+assert 'applicationIdSuffix = ".preview49"' in read('app/build.gradle.kts')
+assert 'Eclipse Cache Test 0.4.9' in read('app/build.gradle.kts')
 assert 'WindowInsets.Type.ime()' in activity
 assert 'MobileWindowPadding.resolve(' in activity
 assert 'MobileWindowPaddingTest.kt' in '\n'.join(p.name for p in (root / 'app/src/test/java/dev/privatecompanion/eclipse').glob('*'))
@@ -146,4 +146,22 @@ assert 'ReplyLength.fromStored(' in secure
 assert 'replyLength' in secure
 assert 'ReplyLength.kt' in '\n'.join(p.name for p in (root / 'app/src/main/java/dev/privatecompanion/eclipse').glob('*'))
 assert 'ChatLayoutAndReplyLengthTest.kt' in '\n'.join(p.name for p in (root / 'app/src/test/java/dev/privatecompanion/eclipse').glob('*'))
-print('PASS: V0.4.8 compact UI, streamed local replies, offline/privacy/build assertions')
+cache_cpp = read('app/src/main/cpp/bridge.cpp')
+cache_header = read('app/src/main/cpp/prompt_cache_policy.h')
+cache_tests = read('tests/native/prompt_cache_policy_test.cpp')
+ci = read('.github/workflows/android-debug.yml')
+assert 'reusable_prefix' in cache_cpp and 'reusable_prefix' in cache_header
+assert 'current_prompt.size() - 1' in cache_header
+assert 'llama_memory_seq_rm(mem, 0,' in cache_cpp
+assert 'llama_memory_clear(mem, true)' in cache_cpp
+assert 'cached_prompt_tokens.clear();' in cache_cpp
+assert 'cached_prompt_tokens = std::move(tokens);' in cache_cpp
+assert 'llama_memory_seq_pos_min(mem, 0)' in cache_cpp
+assert 'llama_memory_seq_pos_max(mem, 0)' in cache_cpp
+assert 'nativeReplyDiagnostics' in cache_cpp
+assert 'lastReplyDiagnostics()' in model
+assert 'lastInferenceDiagnostics = diagnostics' in activity
+assert 'Copy local response performance' in activity
+assert '10 native cache-prefix policy cases' in cache_tests
+assert 'g++ -std=c++17' in ci and 'tests/native/prompt_cache_policy_test.cpp' in ci
+print('PASS: V0.4.9 native prefix reuse, timing, rollback/offline/privacy/build source assertions')
