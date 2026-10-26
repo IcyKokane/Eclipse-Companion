@@ -19,7 +19,7 @@ LABEL = "Eclipse Companion"
 
 
 def read_badging(badging: str) -> tuple[str, int, str, str]:
-    package = re.search(r"^package: name='([^']+)' versionCode='(\\d+)' versionName='([^']+)'", badging, re.M)
+    package = re.search(r"^package: name='([^']+)' versionCode='(\d+)' versionName='([^']+)'", badging, re.M)
     label = re.search(r"^application-label:'([^']+)'", badging, re.M)
     if package is None or label is None:
         raise ValueError("Incomplete Android package metadata")
@@ -27,7 +27,7 @@ def read_badging(badging: str) -> tuple[str, int, str, str]:
 
 
 def normalize_digest(text: str) -> str:
-    result = re.sub(r"[:\\s]", "", text).lower()
+    result = re.sub(r"[:\s]", "", text).lower()
     if not re.fullmatch(r"[0-9a-f]{64}", result):
         raise ValueError("Expected signing certificate SHA-256 must be exactly 64 hex digits")
     return result
@@ -43,13 +43,13 @@ def verify_metadata(badging: str, permissions: str, signatures: str,
             f"Unexpected APK identity: {pkg}, {code}, {version}, {label}; "
             f"expected {expected_package}, {expected_code}, {expected_version}, {expected_label}"
         )
-    if re.search(r"android\\.permission\\.INTERNET\\b", permissions):
+    if re.search(r"android\.permission\.INTERNET\b", permissions):
         raise ValueError("Release APK must not request the INTERNET permission")
-    if re.search(r"android\\.permission\\.ACCESS_NETWORK_STATE\\b", permissions):
+    if re.search(r"android\.permission\.ACCESS_NETWORK_STATE\b", permissions):
         raise ValueError("Release APK must not request network state")
     if not re.search(r"Verified using v2 scheme.*: true", signatures, flags=re.I):
         raise ValueError("Release must be verified with APK Signature Scheme v2")
-    hashes = re.findall(r"Signer #\\d+ certificate SHA-256 digest:\\s*([0-9a-fA-F: ]{64,95})",
+    hashes = re.findall(r"Signer #\d+ certificate SHA-256 digest:\s*([0-9a-fA-F: ]{64,95})",
                         signatures, flags=re.I)
     if len(hashes) != 1 or normalize_digest(hashes[0]) != normalize_digest(expected_cert):
         raise ValueError("Release certificate does not match the owner-pinned SHA-256 digest")
