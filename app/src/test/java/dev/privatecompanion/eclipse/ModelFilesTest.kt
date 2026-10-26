@@ -60,6 +60,17 @@ object ModelFilesChecks {
             checkThat(target.readBytes().contentEquals(newer), "valid target wins over stale backup")
             checkThat(!backup.exists(), "stale backup removed")
             checkThat(fail { ModelFiles.importInto(dir, old.inputStream(), limit=12) }, "small limit rejected")
+            val beforeLowStorage = target.readBytes()
+            checkThat(fail {
+                ModelFiles.importInto(dir, old.inputStream(),
+                    reserveFreeBytes = 128L * 1024 * 1024,
+                    freeBytes = { 0L })
+            }, "low-storage guard aborts copying")
+            checkThat(target.readBytes().contentEquals(beforeLowStorage), "old model preserved if phone runs out of space")
+            checkThat(!File(dir, "model_import.tmp").exists(), "low-storage staging cleaned")
+            checkThat(fail {
+                ModelFiles.importInto(dir, old.inputStream(), reserveFreeBytes = -1)
+            }, "negative disk reserve rejected")
         } finally { dir.deleteRecursively() }
         return count
     }

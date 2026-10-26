@@ -34,9 +34,12 @@ object ModelFiles {
      */
     fun importInto(
         dir: File, source: InputStream, limit: Long = MAX_BYTES,
-        progress: (Long) -> Unit = {}
+        progress: (Long) -> Unit = {},
+        reserveFreeBytes: Long = ModelSetupGuide.RESERVED_DISK_BYTES,
+        freeBytes: () -> Long = { dir.usableSpace }
     ): Long {
         require(limit >= 1024) { "Invalid size limit" }
+        require(reserveFreeBytes >= 0) { "Invalid disk reserve" }
         require(dir.isDirectory) { "Model directory missing" }
         val target = File(dir, "companion.gguf")
         val staging = File(dir, "model_import.tmp")
@@ -65,6 +68,10 @@ object ModelFiles {
                         if (count == 0) error("Model provider returned no data")
                         written += count
                         require(written <= limit) { "Model exceeds size limit" }
+                        // Guard unknown-size providers and storage changing during a long import.
+                        check(freeBytes() >= reserveFreeBytes) {
+                            "Free storage fell below the 128 MiB import reserve"
+                        }
                         output.write(buffer, 0, count)
                         progress(written)
                     }
