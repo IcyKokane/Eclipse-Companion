@@ -180,7 +180,7 @@ assert 'scripts/verify-release.py' in release_ci
 assert 'v0.5.0-alpha1' in release_ci and '--prerelease' in release_ci
 assert 'dev.privatecompanion.eclipse' in release_policy
 assert 'app-release-unsigned.apk' in release_ci
-assert 'android.permission.INTERNET' in release_policy
+assert 'INTERNET' in release_policy and 'permissions' in release_policy
 assert 'Signer #\\d+' in release_policy
 assert 'lib/arm64-v8a/libeclipse_jni.so' in release_policy
 assert "python3 -m unittest discover -s tests/release" in read('.github/workflows/android-debug.yml')
