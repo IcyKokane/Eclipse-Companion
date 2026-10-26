@@ -559,18 +559,37 @@ class MainActivity : Activity() {
         val ticket = replyGate.begin()
         val profileSnapshot = store.profile
         val historySnapshot = store.messages.toList()
+        val lengthSnapshot = store.replyLength
+        val startedAt = android.os.SystemClock.elapsedRealtime()
+        streamingPreview = ""
         LocalModel.beginRequest() // resets previous stop before the executor starts
         sending = true
-        status = "Generating locally; press Stop to cancel."
+        status = "Generating locally · ${lengthSnapshot.title} · tap Stop to cancel."
         if (pane == "Chat") render()
         worker.execute {
-            val result = runCatching { LocalModel.respond(profileSnapshot, historySnapshot) }
+            val progress = ReplyProgress { partial ->
+                runOnUiThread {
+                    if (!isFinishing && !isDestroyed && sending &&
+                        replyGate.mayCommit(ticket) && revision == conversationRevision) {
+                        streamingPreview = partial.take(3000)
+                        if (pane == "Chat") {
+                            previewLabel?.text = streamingPreview
+                            chatScroll.post { if (pane == "Chat" && sending)
+                                chatScroll.fullScroll(View.FOCUS_DOWN) }
+                        }
+                    }
+                }
+            }
+            val result = runCatching {
+                LocalModel.respond(profileSnapshot, historySnapshot, lengthSnapshot, progress)
+            }
             runOnUiThread {
                 if (isFinishing || isDestroyed) return@runOnUiThread
                 if (!replyGate.mayCommit(ticket) || revision != conversationRevision || store.messages.lastOrNull() != last) {
                     replyGate.finish(ticket)
                     if (revision == conversationRevision) status = "Generation stopped. Retry your last message when ready."
                     sending = false // History was cleared/replaced while inference was running
+                    streamingPreview = ""
                     if (pane == "Chat") render()
                     return@runOnUiThread
                 }
@@ -580,7 +599,8 @@ class MainActivity : Activity() {
                     try {
                         store.save()
                         conversationRevision++
-                        status = "Local reply generated."
+                        val seconds = (android.os.SystemClock.elapsedRealtime() - startedAt) / 1000.0
+                        status = "Reply ready in ${"%.1f".format(java.util.Locale.US, seconds)} s · ${lengthSnapshot.title}"
                     } catch (e: Exception) {
                         store.messages.removeAt(store.messages.lastIndex)
                         status = "Local reply failed to save: ${e.message}"
@@ -591,6 +611,7 @@ class MainActivity : Activity() {
                     toast("Local reply stopped or failed. Retry is available.")
                 }
                 sending = false
+                streamingPreview = ""
                 if (pane == "Chat") render()
             }
         }
@@ -838,6 +859,32 @@ class MainActivity : Activity() {
             }
         })
         space(18)
+        section("Response speed")
+        content.addView(label(
+            "Quick (default) generates fewer tokens with less recent history. " +
+                "Detailed replies can take significantly longer on a phone CPU. " +
+                "Replies begin appearing as soon as the local engine starts generating.",
+            13f, muted
+        ))
+        space(8)
+        content.addView(button("Reply length: ${store.replyLength.title}  ·  Tap to change") {
+            val choices = ReplyLength.entries.toTypedArray()
+            AlertDialog.Builder(this)
+                .setTitle("Choose offline reply length")
+                .setSingleChoiceItems(choices.map { it.title }.toTypedArray(),
+                    choices.indexOf(store.replyLength)) { dialog, index ->
+                    dialog.dismiss()
+                    val previous = store.replyLength
+                    store.replyLength = choices[index]
+                    try { store.save() } catch (e: Exception) {
+                        store.replyLength = previous
+                        toast("Could not save reply preference: ${e.message}")
+                    }
+                    render()
+                }
+                .setNegativeButton("Cancel", null).show()
+        })
+        space(16)
         section("Conversation preferences")
         content.addView(label("Adult mode is optional and off by default. It only applies to consensual adult character conversations; actual output depends on your chosen local model.", 14f, muted))
         content.addView(button(if (store.profile.adultMode) "Adult mode: ON (tap to disable)" else "Adult mode: OFF (tap to enable)") {
