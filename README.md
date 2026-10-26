@@ -1,4 +1,30 @@
-# Eclipse Companion · V0.4.5 Android Privacy & Onboarding Preview
+# Eclipse Companion · V0.4.6 Guided Offline Model Setup
+
+**Development preview: built for Android testing, not yet verified on a physical phone.** No account, app INTERNET permission, online chat endpoint, bundled GGUF weights or automatic background activity.
+
+## V0.4.6 improvements
+
+- **A guided three-step local AI setup in Privacy:** choose an example GGUF file, import a downloaded file from the Android document picker, and explicitly load it for chat. The download choice opens a separate browser after confirmation; Eclipse's own inference remains entirely offline.
+- **Verified starter model reference:** the official [Qwen2.5-1.5B-Instruct-GGUF Q4_K_M](https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/blob/main/qwen2.5-1.5b-instruct-q4_k_m.gguf) single file (~1.12 GB). The in-app **Open official Qwen GGUF download** button opens its directly downloadable `.gguf` link in an external browser. This is an example, not a guaranteed phone-compatible model. A mobile browser's download manager handles transfer; Eclipse itself never downloads remotely.
+- **Installed model diagnostics:** the app displays imported GGUF version (header-only check), model size, loaded/not-loaded state and currently available storage. A valid header alone does not prove architecture/model compatibility; the local engine validates during loading.
+- **Safer GGUF copy:** known-size file import requires space for a second staged copy plus 128 MiB headroom. Unknown-size Android document providers no longer require an arbitrary 3 GiB free up front; they can start above a smaller minimum, but the streaming importer checks free space continuously and aborts if the 128 MiB reserve is threatened. Failed imports remove staging and preserve the prior model.
+- **Additional tests:** eight JUnit `ModelSetupGuideTest` cases plus four extra `ModelFilesChecks` assertions including simulated low storage and rollback. Prior composer, privacy and Android keyboard inset tests remain.
+
+## Phone test
+
+This debug package appears as **Eclipse Model Test 0.4.6**, Android ID `dev.privatecompanion.eclipse.preview46`. It installs separately from 0.4.1 through 0.4.5 and cannot delete or upgrade their data. Keep old installations holding important conversations.
+
+1. Open Chat and tap **Set up local GGUF model** to go to Privacy.
+2. In Privacy choose **Open official Qwen GGUF download**, and accept the browser confirmation. The phone browser should download a file named `qwen2.5-1.5b-instruct-q4_k_m.gguf`; it is about 1.12 GB. Internet access is only needed for the browser download.
+3. Return to Eclipse, choose **Import GGUF model from phone**, and select the downloaded file in Android's Files/Downloads picker.
+4. Observe copy progress and imported file size, then choose **Load local model**. This may use significant RAM; actual success and speed must be verified on your hardware.
+5. Once loaded, return to Chat and send a short test message. Test all screens including keyboard layout and screenshot debugging.
+
+**Limitations:** models larger than the 8 GiB import cap and models with unsupported GGUF versions cannot be imported. Many GGUF architectures may not work with this particular pinned llama.cpp build. There is no encrypted chat export/migration or stable production signing yet. This is still a development preview.
+
+---
+
+## V0.4.5 Android Privacy & Onboarding Preview
 
 **Development preview. Not an on-device-verified stable release.**
 
