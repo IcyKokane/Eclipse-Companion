@@ -9,3 +9,9 @@ app/.cxx/
 app/src/main/cpp/vendor/
 LLAMA_COMMIT.txt
 *.apk
+# Owner signing material must NEVER be committed to Git.
+*.jks
+*.p12
+*.keystore
+.owner-signing/
+dist/

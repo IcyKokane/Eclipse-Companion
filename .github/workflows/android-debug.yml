@@ -33,6 +33,10 @@ jobs:
       - name: Source and companion logic checks
         run: |
           python3 scripts/audit-source.py
+      - name: Owner release identity and signature policy tests
+        run: |
+          python3 -m py_compile scripts/verify-release.py
+          python3 -m unittest discover -s tests/release -p 'test_*.py' -v
       - name: Native prefix-cache policy regression tests
         run: |
           g++ -std=c++17 -O2 -Wall -Wextra -Werror tests/native/prompt_cache_policy_test.cpp -o /tmp/eclipse-cache-policy
@@ -47,11 +51,11 @@ jobs:
           unzip -l "$APK" | grep -q 'lib/arm64-v8a/libeclipse_jni.so'
           ! "$ANDROID_HOME/build-tools/35.0.0/aapt" dump permissions "$APK" | grep -q 'android.permission.INTERNET'
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | grep 'package: name=' | tee apk-metadata.txt
-          grep -q 'dev.privatecompanion.eclipse.preview49' apk-metadata.txt
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | grep 'application-label:.*Eclipse Cache Test 0.4.9'
+          grep -q 'dev.privatecompanion.eclipse.preview50' apk-metadata.txt
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | grep 'application-label:.*Eclipse Signing Test 0.5.0'
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: EclipseCompanion-v0.4.9-prefix-cache-apk
+          name: EclipseCompanion-v0.5.0-release-path-test-apk
           path: app/build/outputs/apk/debug/app-debug.apk
           retention-days: 14
