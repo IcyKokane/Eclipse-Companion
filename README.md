@@ -1,4 +1,31 @@
-# Eclipse Companion · V0.4.9 Incremental Offline Prompt Cache
+# Eclipse Companion · V0.5.0 Owner-Signed Update Foundation
+
+**This is still an Android alpha, not a finished production companion.** The ordinary V0.5.0 CI APK is an isolated, automatically debug-signed test build. The owner-signed stable-package APK requires the owner to configure private signing credentials in GitHub Actions; **it has not been issued automatically**.
+
+## V0.5.0 changes
+
+- New **manual owner-signed release workflow** under `.github/workflows/android-owner-release.yml`. It runs only from `main` after a deliberate `SIGN` confirmation. It does not run on PRs, pushes, or forks.
+- A stable release identity of `dev.privatecompanion.eclipse` (no debug suffix), `versionCode 14`, `versionName 0.5.0`, and launcher label **Eclipse Companion**. Once this build is owner-signed, **future** builds with the exact same certificate and higher versionCode can update it in place without wiping its Android Keystore data or locally imported GGUF.
+- The signing workflow refuses to proceed without four owner-controlled repository secrets and the owner-pinned SHA256 signing certificate fingerprint in a repository variable. It uses `zipalign` and Android `apksigner`, then validates **the final signed APK**, its exact package/version/label, certificate, APK signature v2, required native ARM64 library, and absence of internet/network-state permissions.
+- Successful authorized runs upload the validated APK + SHA256SUMS and create a **private GitHub v0.5.0-alpha1 prerelease**. Signing key files/passwords are never intentionally committed or uploaded as artifacts. Local keystore files are blocked in `.gitignore`.
+- Added a standalone strict release validator and 15 regression tests for wrong signatures, wrong app identity, tampered version metadata, network permissions and corrupt/missing APK payloads.
+- Added **Privacy → App updates & privacy** explaining whether this specific installed APK is a separate debug preview or the stable owner-signed package. Earlier Eclipse features remain, including compact futuristic UI, local streamed chat, Qwen GGUF onboarding, safe prompt caching, and encrypted backup.
+
+## Next-step setup before stable in-place upgrades
+
+See **[Owner signing setup](docs/OWNER_SIGNING.md)** for the detailed, one-time PC/JDK key-generation and GitHub Actions secret/variable configuration procedure. Do **not** send the private keystore or signing passwords in any chat.
+
+**Crucial migration limit:** Previous `.previewXX` installations will **not** magically update to the owner-signed package because Android isolates every package ID. Keep the old install; use V0.4.7+ password-encrypted conversation/settings backup to transfer supported data. Imported GGUF weights and personal images still require separate handling. If you have an old APK with the same base package ID but a different certificate, Android will refuse the upgrade rather than overwrite its data.
+
+## Development APK in this milestone
+
+CI builds `dev.privatecompanion.eclipse.preview50`, labelled **Eclipse Signing Test 0.5.0**, to exercise the existing app, source audits and release policy regression tests **without** requesting your owner signing key. This test APK is still separately installed and cannot itself establish the stable update track.
+
+**Known gaps:** Signed release has not been created without owner keys; in-place updates are not verified on a physical Android device. True model inference speed and prompt-cache compatibility depend on the installed phone/model. A stable signing credential is not a substitute for UI/device validation.
+
+---
+
+## V0.4.9 Incremental Offline Prompt Cache (previous milestone)
 
 **Android development preview.** This release targets the slow replies reported from the owner's phone after V0.4.8 introduced shorter generation modes and streamed previews. No app INTERNET permission, server-side inference or cloud state is introduced.
 
