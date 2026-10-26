@@ -914,6 +914,20 @@ class MainActivity : Activity() {
                 }.show()
         })
         space(18)
+        section("App updates & privacy")
+        val isDevelopmentPreview = packageName != "dev.privatecompanion.eclipse"
+        content.addView(label(
+            if (isDevelopmentPreview)
+                "This is a separate test installation. It cannot update earlier Eclipse previews " +
+                    "or automatically move their private data. Keep the old installation and export " +
+                    "an encrypted backup before uninstalling any app."
+            else
+                "This installation uses the stable Eclipse package ID. Future updates must " +
+                    "be signed with the same owner certificate and a higher versionCode to " +
+                    "preserve local settings, history, and model files.",
+            13f, muted
+        ))
+        space(12)
         section("Portable encrypted backup")
         content.addView(label(
             "Export your companion personality, memories and up to 1,000 chat messages " +
