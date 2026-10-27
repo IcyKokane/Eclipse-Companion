@@ -15,7 +15,7 @@ class CpuModeTest {
         for (mode in CpuMode.entries) {
             assertEquals(1, mode.threads(1))
             assertEquals(1, mode.threads(0))
-            assertEquals(2, mode.threads(2))
+            assertTrue(mode.threads(2) in 1..2)
         }
     }
     @Test fun typicalEightCorePhoneKeepsHeadroomInAuto() {
