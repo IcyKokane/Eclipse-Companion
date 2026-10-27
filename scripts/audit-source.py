@@ -29,7 +29,7 @@ assert 'Graphic Novel' in activity and 'Monochrome' in activity
 assert 'ECLIPSE_ERROR:' in model
 assert '}.onFailure { error ->' in activity
 assert 'd81235049384534c167caea52b85a694f6103d14' in read('scripts/setup-llama.sh')
-assert 'versionName = "0.5.0"' in read('app/build.gradle.kts')
+assert 'versionName = "0.5.1"' in read('app/build.gradle.kts')
 assert 'android.permission.ACCESS_NETWORK_STATE' not in manifest
 assert 'messages.takeLast(1000)' in secure
 assert 'nativeCancel' in model and 'nativeResetCancel' in model
@@ -43,8 +43,8 @@ assert 'stop_requested.store(true' in read('app/src/main/cpp/bridge.cpp')
 assert 'roles.erase(roles.begin() + 1, roles.begin() + 1 + discard)' in read('app/src/main/cpp/bridge.cpp')
 assert 'llama_sampler_accept' in read('app/src/main/cpp/bridge.cpp')
 assert 'model_previous.bak' in secure
-assert 'versionCode = 14' in read('app/build.gradle.kts')
-assert 'EclipseCompanion-v0.5.0-release-path-test-apk' in read('.github/workflows/android-debug.yml')
+assert 'versionCode = 15' in read('app/build.gradle.kts')
+assert 'EclipseCompanion-v0.5.1-cpu-tuning-test-apk' in read('.github/workflows/android-debug.yml')
 assert 'replyGate.mayCommit(ticket)' in activity
 assert 'replyGate.cancel()' in activity
 assert 'override fun onStop()' in activity
@@ -74,8 +74,8 @@ assert 'setSingleChoiceItems(' in activity
 assert 'Screen capture: ALLOWED' in activity and 'Screen capture: BLOCKED' in activity
 assert '"screenshotsAllowed"' not in secure, 'Screenshot permission must never persist'
 assert 'android:name="dev.privatecompanion.eclipse.MainActivity"' in manifest
-assert 'applicationIdSuffix = ".preview50"' in read('app/build.gradle.kts')
-assert 'Eclipse Signing Test 0.5.0' in read('app/build.gradle.kts')
+assert 'applicationIdSuffix = ".preview51"' in read('app/build.gradle.kts')
+assert 'Eclipse CPU Test 0.5.1' in read('app/build.gradle.kts')
 assert 'WindowInsets.Type.ime()' in activity
 assert 'MobileWindowPadding.resolve(' in activity
 assert 'MobileWindowPaddingTest.kt' in '\n'.join(p.name for p in (root / 'app/src/test/java/dev/privatecompanion/eclipse').glob('*'))
@@ -175,9 +175,9 @@ assert 'secrets.ECLIPSE_STORE_PASSWORD' in release_ci
 assert 'secrets.ECLIPSE_KEY_PASSWORD' in release_ci
 assert 'vars.ECLIPSE_CERT_SHA256' in release_ci
 assert 'apksigner" sign' in release_ci
-assert '--cert-sha256' in release_ci and '--version-code 14 --version-name 0.5.0' in release_ci
+assert '--cert-sha256' in release_ci and '--version-code 15 --version-name 0.5.1' in release_ci
 assert 'scripts/verify-release.py' in release_ci
-assert 'v0.5.0-alpha1' in release_ci and '--prerelease' in release_ci
+assert 'v0.5.1-alpha1' in release_ci and '--prerelease' in release_ci
 assert 'dev.privatecompanion.eclipse' in release_policy
 assert 'app-release-unsigned.apk' in release_ci
 assert 'INTERNET' in release_policy and 'permissions' in release_policy
@@ -188,4 +188,21 @@ assert 'test_untrusted_cert' in read('tests/release/test_verify_release.py')
 assert 'test_unexpected_internet_permission' in read('tests/release/test_verify_release.py')
 assert '*.p12' in gitignore and '*.jks' in gitignore
 assert 'val isDevelopmentPreview = packageName != "dev.privatecompanion.eclipse"' in activity
-print('PASS: V0.5.0 signing protections and inherited offline/privacy/build source checks')
+cpu_mode = read('app/src/main/java/dev/privatecompanion/eclipse/CpuMode.kt')
+assert 'enum class CpuMode' in cpu_mode
+assert 'val cores = availableProcessors.coerceIn(1, 64)' in cpu_mode
+assert 'desired.coerceIn(1, minOf(cores, 8))' in cpu_mode
+assert 'CpuModeTest.kt' in '\n'.join(p.name for p in (root / 'app/src/test/java/dev/privatecompanion/eclipse').glob('*'))
+assert 'var cpuMode = CpuMode.AUTO' in secure
+assert 'CpuMode.fromStored(decoded.optString("cpuMode", "AUTO"))' in secure
+assert 'put("cpuMode", cpuMode.name)' in secure
+assert 'oldCpuMode = cpuMode' in secure and 'cpuMode = oldCpuMode' in secure
+assert 'fun load(path: String, threads: Int = 4)' in model
+assert 'loadedModel = false' in model and 'loadedCpuThreads = 0' in model
+assert 'nativeLoad(path, threads, 4096)' in model
+assert 'fun activeCpuThreads()' in model
+assert 'CPU performance:' in activity
+assert 'store.cpuMode.threads(Runtime.getRuntime().availableProcessors())' in activity
+assert 'LocalModel.load(file.absolutePath, selectedThreads)' in activity
+assert 'CPU mode changed. Tap Load local model in Step 3' in activity
+print('PASS: V0.5.1 safe CPU tuning and inherited signing/offline/privacy/build source checks')
