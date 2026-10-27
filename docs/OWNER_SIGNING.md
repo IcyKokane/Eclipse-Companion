@@ -1,6 +1,6 @@
 # Owner-controlled Android signing for Eclipse Companion
 
-This file documents the V0.5.0 **manual release path**, not an already-signed APK.
+This file documents the V0.5.1 **manual release path**, not an already-signed APK.
 
 ## Why this is necessary
 
@@ -14,7 +14,7 @@ be upgraded into one another.
 Starting with the **first owner-signed release**, the stable ID will be
 `dev.privatecompanion.eclipse`. Later owner-signed releases can upgrade it
 if and only if the exact signing key/certificate is retained and the versionCode
-increases beyond 14. The first owner-signed release will **not automatically
+increases beyond 15. The first owner-signed release will **not automatically
 inherit any existing .previewXX app's data**. Preserve those installs, and use
 the V0.4.7+ encrypted export/import (Chats and Settings only) when available.
 Older V0.4.0 builds may also use `dev.privatecompanion.eclipse`, but with a
@@ -79,7 +79,7 @@ prevents normal in-place updates to an app signed with that key.
    final package name/version/label, offline permissions, native ARM64 library,
    APK signature v2 and the owner-pinned SHA-256 signing certificate, and only
    then uploads and publishes the APK as a private GitHub prerelease
-   `v0.5.0-alpha1`.
+   `v0.5.1-alpha1`.
 
 6. Back up your keystore **before** installing this as the first stable
    release. Store the certificate fingerprint, passphrase and backup location
@@ -100,6 +100,6 @@ prevents normal in-place updates to an app signed with that key.
   account, compromised GitHub runner, or malicious source changes.
 - You must retain the same owner key for every later release, update the
   source `versionCode`, and review and repeat the manual signing workflow.
-- **V0.5.0 is an alpha**. Passing CI is not a substitute for Android device
+- **V0.5.1 is an alpha**. Passing CI is not a substitute for Android device
   validation, especially for local GGUF inference, backup restoration and
   app lifecycle behavior.
