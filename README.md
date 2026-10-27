@@ -1,13 +1,40 @@
-# Eclipse Companion · V0.5.0 Owner-Signed Update Foundation
+# Eclipse Companion · V0.5.1 Phone CPU Performance Controls
+
+**Android alpha development preview; not yet device-benchmarked.** This milestone adds a supported way to compare native CPU inference speed on different phones without introducing internet access or third-party API services.
+
+## V0.5.1 changes
+
+- **CPU performance selection** under **Privacy → Response speed**: **Auto** (recommended), **Efficient** (low heat), **Balanced** (up to 4 workers), and **Performance** (up to 6 workers). The implementation caps requests to the phone's reported logical CPU count and 8 threads. Auto reserves headroom and uses at most 4 threads. More threads may be slower or hotter, so compare results rather than assuming Performance is best.
+- Shows the reported logical CPU count, selected thread target, and active loaded-model thread count. **Selection persists in Android Keystore-encrypted settings and is included in portable encrypted backups.**
+- **Explicit apply:** Change a mode, then tap **Load local model** again to unload/reload model weights on the worker. The new mode cannot change a running inference. Existing chats, personality and GGUF file are not deleted by this reload.
+- **Safer JNI state:** a failed native reload can no longer leave a stale “model ready” state or stale active-thread report.
+- Adds six CPU-policy JUnit tests including dual-core and high-core device boundary cases, plus strict source/build guards.
+- Builds isolated Android test application **Eclipse CPU Test 0.5.1** (`dev.privatecompanion.eclipse.preview51`) and advances source to `versionCode 15`, `versionName 0.5.1`.
+- Owner-controlled signing workflow version is aligned to **v0.5.1-alpha1**. An owner-signed release still cannot be produced until the owner configures the secure PKCS12 signing secrets and pinned certificate. This test APK is not the stable update-channel APK.
+
+## Phone test
+
+1. Launch V0.5.1, then import and load a compatible GGUF model under Privacy.
+2. In **Privacy → Response speed**, note the current Auto thread count and leave **Reply length: Quick** selected.
+3. Exchange two or three short replies; use **Copy local response performance** for token and timing stats without conversation text.
+4. Change CPU mode to Efficient or Balanced. Tap **Load local model** to apply the selected setting, then repeat similar exchanges to compare actual speed, device warmth and battery.
+5. Check that a failed model load shows **not loaded** rather than a false-ready indicator. Reopen Privacy and confirm the CPU setting persists after relaunch.
+6. Keep older installations with any valued data; V0.5.1 has a separate debug package. V0.4.7+ backups move supported settings and conversations, not model weights or portraits.
+
+**Limitations:** This does not add GPU inference, guarantee a response latency or solve model incompatibility. Device thermal limits, model size, prompt length and CPU architecture strongly affect token speed. Owner-signed installation, key setup and physical device tests remain pending.
+
+---
+
+## V0.5.0 Owner-Signed Update Foundation (previous milestone)
 
 **This is still an Android alpha, not a finished production companion.** The ordinary V0.5.0 CI APK is an isolated, automatically debug-signed test build. The owner-signed stable-package APK requires the owner to configure private signing credentials in GitHub Actions; **it has not been issued automatically**.
 
 ## V0.5.0 changes
 
 - New **manual owner-signed release workflow** under `.github/workflows/android-owner-release.yml`. It runs only from `main` after a deliberate `SIGN` confirmation. It does not run on PRs, pushes, or forks.
-- A stable release identity of `dev.privatecompanion.eclipse` (no debug suffix), `versionCode 14`, `versionName 0.5.0`, and launcher label **Eclipse Companion**. Once this build is owner-signed, **future** builds with the exact same certificate and higher versionCode can update it in place without wiping its Android Keystore data or locally imported GGUF.
+- A stable release identity of `dev.privatecompanion.eclipse` (no debug suffix), `versionCode 15`, `versionName 0.5.1`, and launcher label **Eclipse Companion**. Once this build is owner-signed, **future** builds with the exact same certificate and higher versionCode can update it in place without wiping its Android Keystore data or locally imported GGUF.
 - The signing workflow refuses to proceed without four owner-controlled repository secrets and the owner-pinned SHA256 signing certificate fingerprint in a repository variable. It uses `zipalign` and Android `apksigner`, then validates **the final signed APK**, its exact package/version/label, certificate, APK signature v2, required native ARM64 library, and absence of internet/network-state permissions.
-- Successful authorized runs upload the validated APK + SHA256SUMS and create a **private GitHub v0.5.0-alpha1 prerelease**. Signing key files/passwords are never intentionally committed or uploaded as artifacts. Local keystore files are blocked in `.gitignore`.
+- Successful authorized runs upload the validated APK + SHA256SUMS and create a **private GitHub v0.5.1-alpha1 prerelease (current workflow)**. Signing key files/passwords are never intentionally committed or uploaded as artifacts. Local keystore files are blocked in `.gitignore`.
 - Added a standalone strict release validator and 15 regression tests for wrong signatures, wrong app identity, tampered version metadata, network permissions and corrupt/missing APK payloads.
 - Added **Privacy → App updates & privacy** explaining whether this specific installed APK is a separate debug preview or the stable owner-signed package. Earlier Eclipse features remain, including compact futuristic UI, local streamed chat, Qwen GGUF onboarding, safe prompt caching, and encrypted backup.
 
