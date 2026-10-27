@@ -865,6 +865,51 @@ class MainActivity : Activity() {
         })
         space(18)
         section("Response speed")
+        val availableCpus = Runtime.getRuntime().availableProcessors().coerceAtLeast(1)
+        val requestedCpuThreads = store.cpuMode.threads(availableCpus)
+        val activeThreads = LocalModel.activeCpuThreads()
+        content.addView(label(
+            "This phone reports $availableCpus logical CPU cores. " +
+                "Mode: ${store.cpuMode.title} ($requestedCpuThreads inference threads). " +
+                if (activeThreads > 0) "Currently loaded with $activeThreads threads."
+                else "No model loaded into memory.",
+            13f, muted
+        ))
+        space(8)
+        content.addView(button("CPU performance: ${store.cpuMode.title}  ·  Tap to change") {
+            if (sending || modelBusy) {
+                toast("Finish the current reply or model operation first")
+                return@button
+            }
+            val choices = CpuMode.entries.toTypedArray()
+            AlertDialog.Builder(this)
+                .setTitle("Local AI CPU performance")
+                .setMessage(
+                    "Auto is recommended. More threads may improve speed on some phones, " +
+                        "but can also increase heat, battery use, or even make replies slower. " +
+                        "The change takes effect when you tap Load local model again."
+                )
+                .setSingleChoiceItems(choices.map { it.title }.toTypedArray(),
+                    choices.indexOf(store.cpuMode)) { dialog, index ->
+                    dialog.dismiss()
+                    val previous = store.cpuMode
+                    store.cpuMode = choices[index]
+                    try { store.save() } catch (e: Exception) {
+                        store.cpuMode = previous
+                        toast("Cannot save CPU mode: ${e.message}")
+                    }
+                    render()
+                }
+                .setNegativeButton("Cancel", null).show()
+        })
+        if (activeThreads > 0 && activeThreads != requestedCpuThreads) {
+            content.addView(label(
+                "CPU mode changed. Tap Load local model in Step 3 to apply it. " +
+                    "Reloading unloads and reopens the model; conversations are retained.",
+                12f, cyan
+            ))
+        }
+        space(12)
         if (lastInferenceDiagnostics.isNotBlank()) {
             content.addView(label("Last reply · $lastInferenceDiagnostics", 12f, muted))
             space(6)
@@ -1264,12 +1309,20 @@ class MainActivity : Activity() {
             render()
             return
         }
+        val selectedThreads = store.cpuMode.threads(Runtime.getRuntime().availableProcessors())
         modelBusy = true
-        status = "Loading model locally. This may use several GB of RAM."
+        status = "Loading model locally using $selectedThreads CPU threads. This may use several GB of RAM."
         render()
         worker.execute {
-            val result = try { LocalModel.load(file.absolutePath) } catch (_: Exception) { false }
-            runOnUiThread { modelBusy = false; status = if (result) "Local model loaded and ready." else "Model failed to load. Check RAM, model format and the compiled native engine."; render() }
+            val result = try { LocalModel.load(file.absolutePath, selectedThreads) }
+                catch (_: Exception) { false }
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                modelBusy = false
+                status = if (result) "Local model ready · $selectedThreads CPU threads."
+                    else "Model failed to load. Check available RAM, model format and local engine."
+                render()
+            }
         }
     }
 
